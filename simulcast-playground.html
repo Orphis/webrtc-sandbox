@@ -1,0 +1,790 @@
+<html>
+
+<head>
+  <title>WebRTC Playground</title>
+  <style>
+    body {
+      font-family: monospace;
+    }
+
+    .encodingBox {
+      display: inline-block;
+      border: 1px solid black;
+      margin: 5px 5px 5px 5px;
+      padding: 5px 5px 5px 5px;
+      max-width: 90%;
+    }
+
+    video {
+      max-width: 600px;
+    }
+  </style>
+</head>
+
+<body>
+  <table>
+    <tr>
+      <td>
+        <video id="videoSource" autoplay muted></video>
+      </td>
+      <td>
+        <video id="videoMerged" autoplay></video>
+      </td>
+    </tr>
+    <tr>
+      <td><span id="videoSourceSize">0x0</span> <span id="videoSourceFps">0</span> fps</td>
+      <td><span id="videoMergedSize">0x0</span> <span id="videoMergedFps">0</span> fps</td>
+    </tr>
+    <tr>
+      <td id="videoSourceBps">0 bps</td>
+      <td id="videoMergedBps">0 bps</td>
+    </tr>
+  </table>
+  <button id="start">Start!</button>
+  <button id="stop">Stop</button>
+  <select id="resolution">
+    <option value="QVGA">320x240 (QVGA)</option>
+    <option value="VGA">640x480 (VGA)</option>
+    <option value="HD">1280x720 (HD)</option>
+    <option value="FullHD">1920x1080 (FullHD)</option>
+    <option value="4K">4096x2160 (4K)</option>
+    <option value="8K">7680x4320 (8K)</option>
+    <option value="screen">Screen</option>
+    <option value="screen-FullHD">Screen (FullHD)</option>
+    <option value="screen-HD">Screen (HD)</option>
+    <option value="screen-conference">Screen (conference)</option>
+    <option value="screen-conference-FullHD">Screen (FullHD, conference)</option>
+    <option value="screen-conference-HD">Screen (HD, conference)</option>
+  </select>
+  <select id="codec">
+    <option value="VP8">VP8</option>
+    <option value="VP9">VP9</option>
+    <option value="H264">H264</option>
+  </select>
+  <select id="contentHint">
+    <option value="">No Hint</option>
+    <option value="motion">Motion</option>
+    <option value="detail">Detail</option>
+    <option value="text">Text</option>
+  </select> |
+  <button id="getParameters">Get parameters</button>
+  <button id="setParameters">Set parameters</button> |
+  <button id="receiverGetParameters">Receiver Get parameters</button> |
+  <button id="addLayer">Add layer</button>
+  <button id="removeLayer">Remove layer</button>
+  <select id="splitLayer">
+    <option value="merged">Merged layers</option>
+    <option value="split">Split layers</option>
+  </select>
+  <br>
+  <div class="encodingBox" data-layer="0">
+    Layer
+    <span id="layerId">0</span> <span id="videoSize">0x0</span> <span id="videoFps">0</span> fps
+    <br>
+    <div id="videoPreview" style="display: none">
+      <video id="video" autoplay muted></video>
+      <br>
+      <span id="videoBrInfo"></span>
+    </div>
+    <br>
+    <label>maxBitrate (bps):
+      <input type="number" id="maxBitrate" value="3000000" size="8" />
+    </label>
+    <br>
+    <label>scaleResolutionDownBy:
+      <input type="number" id="scaleResolutionDownBy" value="1" size="3" />
+    </label>
+    <br>
+    <label>maxFramerate (fps):
+      <input type="number" id="maxFramerate" value="60" size="3" />
+    </label>
+    <br>
+    <label>Active:
+      <select id="active">
+        <option value="on">On</option>
+        <option value="off">Off</option>
+      </select>
+    </label>
+    <br>
+    <label>priority:
+      <select id="priority">
+        <option value="very-low">Very Low</option>
+        <option value="low" selected>Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+    </label>
+    <br>
+  </div>
+  <br>
+  <label>degradationPreference:
+    <select id="degradationPreference">
+      <option value="balanced" selected>Balanced</option>
+      <option value="maintain-framerate">Maintain framerate</option>
+      <option value="maintain-resolution">Maintain resolution</option>
+    </select>
+  </label>
+  <br>
+  <div id="div"></div>
+
+  <script>
+    let constraints = {
+      "QVGA": {
+        video: {
+          width: 320,
+          height: 240
+        },
+      },
+      "VGA": {
+        video: {
+          width: 640,
+          height: 480
+        },
+      },
+      "HD": {
+        video: {
+          width: 1280,
+          height: 720
+        },
+      },
+      "FullHD": {
+        video: {
+          width: 1920,
+          height: 1080
+        },
+      },
+      "4K": {
+        video: {
+          width: 4096,
+          height: 2160
+        },
+      },
+      "8K": {
+        video: {
+          width: 7680,
+          height: 4320
+        },
+      },
+      "screen": {
+        video: true,
+      },
+      "screen-FullHD": {
+        video: { width: { max: 1920 }},
+      },      
+      "screen-HD": {
+        video: { width: { max: 1280 }},
+      },
+      "screen-conference": {
+        video: true,
+      },
+      "screen-conference-FullHD": {
+        video: { width: { max: 1920 }},
+      },      
+      "screen-conference-HD": {
+        video: { width: { max: 1280 }},
+      },
+    };
+
+    var pc1, pc2;
+    var stream;
+    var transceiver;
+    var sender;
+    var asender;
+    var lastBitrateMesurementTime;
+    var lastBytesSent;
+    var lastBytesReceived;
+    let streamResolution;
+    let intervals = [];
+
+    var stopPeerConnection = () => {
+      if (pc1) {
+        pc1.close();
+      }
+      if (pc2) {
+        videoMerged.srcObject = null;
+        pc2.close();
+      }
+
+      let layers = document.querySelectorAll('div[data-layer]');
+      for (let layer of layers) {
+        layer.querySelector("#videoPreview").style.display = "none";
+      }
+
+      for (let interval of intervals) {
+        window.clearInterval(interval);
+      }
+    }
+
+    var setupPeerConnection = async () => {
+      stopPeerConnection();
+
+      pc1 = new RTCPeerConnection({
+        sdpSemantics: "unified-plan"
+      });
+      pc2 = new RTCPeerConnection({
+        sdpSemantics: "unified-plan"
+      });
+
+      pc1.onicecandidate = e => {
+        if (e.candidate) {
+          if (splitLayer.value == "split") {
+            let params = readParameters();
+
+            for(let layerIndex in params.encodings) {
+              let newCandidate = new RTCIceCandidate({
+                candidate: e.candidate.candidate,
+                sdpMid: layerIndex,
+                sdpMLineIndex: layerIndex,
+                usernameFragment: e.candidate.usernameFragment,
+              });
+              pc2.addIceCandidate(newCandidate);
+            }
+          } else 
+            pc2.addIceCandidate(e.candidate);
+        }
+      };
+
+      pc2.onicecandidate = e => {
+        if (e.candidate) {
+          if (splitLayer.value == "split") {
+            //console.log("pc2 candidate " + e.candidate.sdpMLineIndex);
+            let newCandidate = new RTCIceCandidate({
+              candidate: e.candidate.candidate,
+              sdpMid: "0", //e.candidate.sdpMid,
+              sdpMLineIndex: e.candidate.sdpMLineIndex,
+              usernameFragment: e.candidate.usernameFragment,
+            });
+            //console.log(newCandidate);
+            pc1.addIceCandidate(newCandidate);
+          } else
+            pc1.addIceCandidate(e.candidate);
+        }
+      };
+      pc2.ontrack = async e => {
+        try {
+          if (splitLayer.value == "merged") {
+            await setStream(videoMerged, videoMergedSize, videoMergedFps, e.streams[0]);
+          } else {
+            console.log("Got stream with id:" + e.streams[0].id +
+              " and track id:" + e.streams[0].getTracks()[0].id);
+            let streamId = e.streams[0].id;
+            let layerId = streamId.replace("layer", "");
+
+            let div = document.querySelector('div[data-layer="' + layerId + '"]');
+            div.querySelector("#videoPreview").style.display = "inline";
+            let videoElement = div.querySelector("video");
+            let videoSize = div.querySelector("#videoSize");
+            let videoFps = div.querySelector("#videoFps");
+            await setStream(videoElement, videoSize, videoFps, e.streams[0]);
+          }
+          intervals.push(setInterval(async () => {
+            let [s1, s2] = await Promise.all([pc1.getStats(),
+              pc2.getStats()
+            ]);
+            let currentTime = performance.now();
+            let deltaTime = currentTime - lastBitrateMesurementTime;
+            let bytesSent = findStat(s1, "outbound-rtp").bytesSent;
+            let bytesReceived;
+            try {
+              bytesReceived = findStat(s2, "inbound-rtp").bytesReceived;
+            } catch(e) {}
+
+            videoSourceBps.textContent = ((bytesSent - lastBytesSent) / deltaTime * 1000 * 8).toFixed(0) + " bps";
+            videoMergedBps.textContent = ((bytesReceived - lastBytesReceived) / deltaTime * 1000 * 8).toFixed(0) + " bps";
+            lastBitrateMesurementTime = currentTime;
+            lastBytesSent = bytesSent;
+            lastBytesReceived = bytesReceived;
+          }, 1000));
+        } catch (e) {
+          log(e);
+        }
+      }
+
+      pc1.oniceconnectionstatechange = e => log(pc1.iceConnectionState);
+      pc1.onnegotiationneeded = async e => {
+        let pc1Offer = await pc1.createOffer();
+        if (!transceiver.setCodecPreferences) {
+          pc1Offer = filterCodecs(pc1Offer);
+        }
+        if (resolution.value.includes("-conference")) {
+          pc1Offer = addConferenceFlag(pc1Offer);
+        }
+        await pc1.setLocalDescription(pc1Offer);
+
+        let pc2Offer = {
+          type: 'offer',
+          sdp: pc1.localDescription.sdp,
+        };
+
+        if (splitLayer.value == "split") {
+          if(pc1Offer.sdp.includes("a=simulcast:"))
+            splitUnifiedPlanOffer(pc2Offer);
+          else
+            splitPlanBOffer(pc2Offer);
+        }
+
+        console.log("pc2 offer: " + pc2Offer.sdp);
+        await pc2.setRemoteDescription(pc2Offer);
+
+        let answer = await pc2.createAnswer();
+        await pc2.setLocalDescription(answer);
+        let pc1Answer = {
+          type: "answer",
+          sdp: pc2.localDescription.sdp,
+        }
+/**/
+        if (splitLayer.value == "split") {
+          if(pc1Offer.sdp.includes("a=simulcast:"))
+            splitUnifiedPlanAnswer(pc1Answer);
+          else
+            splitPlanBAnswer(pc1Answer);
+        }
+
+        if (resolution.value.includes("-conference")) {
+          pc1Answer = addConferenceFlag(pc1Answer);
+        }
+
+        console.log("pc1 answer: " + pc1Answer.sdp);
+        await pc1.setRemoteDescription(pc1Answer);
+/**/
+      }
+
+      let params = readParameters();
+      console.log(JSON.stringify(params, 0, 2));
+      transceiver = pc1.addTransceiver(
+        stream.getVideoTracks()[0], {
+          streams: [stream],
+          sendEncodings: params.encodings,
+        });
+      sender = transceiver.sender;
+      
+      if (transceiver.setCodecPreferences) {
+        let codecs = RTCRtpSender.getCapabilities('video').codecs.filter(c =>
+          c.mimeType.includes(codec.value));
+        transceiver.setCodecPreferences(codecs);
+      }
+
+      lastBitrateMesurementTime = performance.now();
+      lastBytesSent = 0;
+      lastBytesReceived = 0;
+    }
+
+    var splitUnifiedPlanOffer = (offer) => {
+      let sdpLines = offer.sdp.split("\r\n");
+
+      mSectionStart = sdpLines.findIndex(line => line.startsWith("m="));
+      mSection = sdpLines.splice(mSectionStart);
+
+      let layerRIDS = mSection.filter(line => line.startsWith("a=simulcast:")).map(
+          line => line.replace("a=simulcast:send ", "").split(";")
+        )[0];
+
+      let midExtmapId = mSection.filter(line => line.includes("urn:ietf:params:rtp-hdrext:sdes:mid")).map(line =>
+        line.replace("a=extmap:", "").split(" ")[0]
+      )[0];
+
+      let ridExtmapId = mSection.filter(line => line.includes("urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id")).map(line =>
+        line.replace("a=extmap:", "").split(" ")[0]
+      )[0];
+
+      sdpLines = sdpLines.map(line => {
+        if (line.startsWith("a=group:BUNDLE"))
+          return "a=group:BUNDLE " + layerRIDS.join(" ");
+
+        return line;
+      });
+
+      for (let layerName of layerRIDS) {
+        sdpLines = sdpLines.concat(mSection.map(line => {
+          if (line.match(/a=msid:/)) {
+            return "a=msid:" + layerName + " " + layerName;
+          }
+
+          if (line.startsWith("a=mid:"))
+            return "a=mid:" + layerName;
+
+          if (line.startsWith("a=extmap:" + midExtmapId + " "))
+            return "a=extmap:" + midExtmapId + " urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id";
+
+          if (line.startsWith("a=extmap:" + ridExtmapId + " "))
+            return "a=extmap:" + ridExtmapId + " urn:ietf:params:rtp-hdrext:sdes:mid";
+
+          if (line.startsWith("a=rid:") || line.startsWith("a=simulcast:"))
+            return null;
+
+          return line;
+        }));
+      }
+
+      offer.sdp = sdpLines
+        .filter(line => line && line.length > 0)
+        .join("\r\n") + "\r\n";
+    }
+
+    var splitUnifiedPlanAnswer = (answer) => {
+      let sdpLines = answer.sdp.split("\r\n");
+
+      let mSectionStart = sdpLines.findIndex(line => line.startsWith("m="));
+      let mSection = sdpLines.splice(mSectionStart);
+
+      // Remove extra m= sections
+      mSectionStart = mSection.slice(1).findIndex(line => line.startsWith("m="));
+      if (mSectionStart != -1)
+        mSection.splice(mSectionStart);
+
+      let midExtmapId = mSection.filter(line => line.includes("urn:ietf:params:rtp-hdrext:sdes:mid")).map(line =>
+        line.replace("a=extmap:", "").split(" ")[0]
+      )[0];
+
+      let ridExtmapId = mSection.filter(line => line.includes("urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id")).map(line =>
+        line.replace("a=extmap:", "").split(" ")[0]
+      )[0];
+
+      sdpLines = sdpLines.map(line => {
+        if (line.startsWith("a=group:BUNDLE"))
+          return "a=group:BUNDLE 0";
+
+        return line;
+      });
+
+      mSection = mSection.map(line => {
+        if (line.startsWith("a=mid:"))
+          return "a=mid:0";
+
+        if (line.startsWith("a=extmap:" + midExtmapId + " "))
+          return "a=extmap:" + midExtmapId + " urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id";
+
+        if (line.startsWith("a=extmap:" + ridExtmapId + " "))
+          return "a=extmap:" + ridExtmapId + " urn:ietf:params:rtp-hdrext:sdes:mid";
+
+        return line;
+      });
+
+      let params = readParameters();
+      for(let r in params.encodings) {
+        mSection.push("a=rid:" + r + " recv");
+      }
+      mSection.push("a=simulcast:recv " + Array.from(params.encodings.keys()).join(";"));
+
+      answer.sdp = sdpLines.concat(mSection)
+        .filter(line => line && line.length > 0).join("\r\n") + "\r\n";
+    }
+
+    var splitPlanBOffer = (offer) => {
+      let sdpLines = offer.sdp.split("\r\n");
+
+      mSectionStart = sdpLines.findIndex(line => line.startsWith(
+        "m="));
+      mSection = sdpLines.splice(mSectionStart);
+
+      let layerSSRC = mSection.filter(line => line.startsWith(
+        "a=ssrc-group:FID")).map(
+          line => line.replace("a=ssrc-group:FID ", "").split(" ")
+        );
+
+      sdpLines = sdpLines.map(line => {
+        if (line.startsWith("a=group:BUNDLE"))
+          return "a=group:BUNDLE " + Array.from(layerSSRC
+            .keys())
+            .join(
+              " ");
+
+        return line;
+      });
+
+      for (let layerIndex in layerSSRC) {
+        sdpLines = sdpLines.concat(mSection.map(line => {
+          if (line.startsWith("a=ssrc:")) {
+            if (!(line.startsWith("a=ssrc:" + layerSSRC[
+              layerIndex][0]) ||
+              line.startsWith("a=ssrc:" + layerSSRC[
+                layerIndex][1]))) {
+              return null;
+            }
+          }
+
+          if (line.match(/a=ssrc:.*msid:/)) {
+            return line.replace(/msid:.*/, "msid:layer" +
+              layerIndex + " layer" + layerIndex);
+          }
+
+          if (line.match(/a=ssrc:.*label:/)) {
+            return line.replace(/label:.*/, "label:layer" +
+              layerIndex);
+          }
+
+          if (line.match(/a=msid:/)) {
+            return "a=msid:layer" + layerIndex + " layer" +
+              layerIndex;
+          }
+
+          if (line.startsWith("a=mid:"))
+            return "a=mid:" + layerIndex;
+
+          if (line.startsWith("a=ssrc-group:"))
+            return null;
+
+          return line;
+        }));
+      }
+
+      offer.sdp = sdpLines.filter(line => line && line.length >
+        0).join(
+          "\r\n") + "\r\n";
+    }
+
+    var splitPlanBAnswer = (answer) => {
+      let sdpLines = answer.sdp.split("\r\n");
+
+      let mSectionStart = sdpLines.findIndex(line => line
+        .startsWith(
+          "m="));
+      let mSection = sdpLines.splice(mSectionStart);
+
+      // Remove extra m= sections
+      mSectionStart = mSection.slice(1).findIndex(line => line
+        .startsWith(
+          "m="));
+      if (mSectionStart != -1)
+        mSection.splice(mSectionStart);
+
+      sdpLines = sdpLines.map(line => {
+        if (line.startsWith("a=group:BUNDLE"))
+          return "a=group:BUNDLE 0";
+
+        return line;
+      });
+
+      answer.sdp = sdpLines.concat(mSection).filter(line =>
+        line &&
+        line.length > 0).join(
+          "\r\n") + "\r\n";
+    }
+
+    var addConferenceFlag = (offer) => {
+      let sdpLines = offer.sdp.split("\r\n");
+
+      sdpLines.push("a=x-google-flag:conference");
+
+      offer.sdp = sdpLines
+        .filter(line => line && line.length > 0)
+        .join("\r\n") + "\r\n";
+
+      return offer;
+    }
+
+    var readParameters = (params) => {
+      // Can't use getParameters since we need this for addTransceiver too
+      let divCount = document.querySelectorAll('div[data-layer]').length;
+      if (!params) {
+        params = {
+          degradationPreference: "balanced",
+          encodings: [],
+        };
+        for (let i = 0; i < divCount; ++i)
+          params.encodings.push({
+            "rid": i,
+          });
+      }
+
+      for (let i = 0; i < divCount; ++i) {
+        let div = document.querySelector('div[data-layer="' + i + '"]');
+        params.encodings[i].active = div.querySelector("#active").value == "on" ? true : false;
+        params.encodings[i].priority = div.querySelector("#priority").value;
+
+        let maxBitrate = div.querySelector("#maxBitrate").valueAsNumber;
+        if (isNaN(maxBitrate)) {
+          if (params.encodings[i].maxBitrate !== undefined) {
+            delete params.encodings[i].maxBitrate;
+          }
+        } else {
+          params.encodings[i].maxBitrate = maxBitrate;
+        }
+
+        let scaleResolutionDownBy = div.querySelector(
+          "#scaleResolutionDownBy").valueAsNumber;
+        if (isNaN(scaleResolutionDownBy)) {
+          if (params.encodings[i].scaleResolutionDownBy !== undefined) {
+            delete params.encodings[i].scaleResolutionDownBy;
+          }
+        } else {
+          params.encodings[i].scaleResolutionDownBy = scaleResolutionDownBy;
+        }
+
+        let maxFramerate = div.querySelector("#maxFramerate").valueAsNumber;
+        if (isNaN(maxFramerate)) {
+          if (params.encodings[i].maxFramerate !== undefined) {
+            delete params.encodings[i].maxFramerate;
+          }
+        } else {
+          params.encodings[i].maxFramerate = maxFramerate;
+        }
+      }
+      params.degradationPreference = document.querySelector("#degradationPreference").value;
+
+      return params;
+    }
+
+    var filterCodecs = (offer) => {
+      let sdpLines = offer.sdp.split("\r\n");
+      let codecs = [];
+
+      // Robust parsing
+      codecs = sdpLines.filter(l => l.startsWith("a=rtpmap:") && l.includes(codec.value))
+        .map(l => l.split(':')[1].split(' ')[0]);
+
+      console.log("Keeping codec pt: " + codecs.join(' '));
+
+      sdpLines = sdpLines.filter(l => {
+        if (l.startsWith('a=rtpmap:') && !codecs.includes(l.split(':')[1].split(' ')[0]))
+          return false;
+        if (l.startsWith('a=rtcp-fb:') && !codecs.includes(l.split(':')[1].split(' ')[0]))
+          return false;
+        if (l.startsWith('a=fmtp:') && !codecs.includes(l.split(':')[1].split(' ')[0]))
+          return false;
+        return true;
+      }).map(l => {
+        if (l.startsWith("m=")) {
+          return l.split(' ', 3).concat(codecs).join(' ');
+        }
+        return l;
+      });
+
+      return {
+        type: offer.type,
+        sdp: sdpLines.join('\r\n')
+      };
+    }
+
+    document.querySelector('#start').onclick = async () => {
+      try {
+        resolutionName = resolution.value;
+        if (stream && streamResolution && streamResolution != resolutionName) {
+          for (let track of stream.getVideoTracks())
+            track.stop();
+          stream = null;
+        }
+        if (!stream) {
+          if (resolutionName.includes("screen"))
+            stream = await navigator.mediaDevices.getDisplayMedia(constraints[resolutionName]);
+          else 
+            stream = await navigator.mediaDevices.getUserMedia(constraints[resolutionName]);
+          streamResolution = resolutionName;
+
+          stream.getVideoTracks()[0].contentHint = contentHint.value;
+
+          await setStream(videoSource, videoSourceSize, videoSourceFps, stream);
+        }
+
+        setupPeerConnection();
+      } catch (e) {
+        log(e);
+      }
+    }
+
+    document.querySelector('#stop').onclick = () => {
+      for (let track of stream.getVideoTracks())
+        track.stop();
+      stream = null;
+      stopPeerConnection();
+    }
+
+    document.querySelector('#getParameters').onclick = async () => {
+      if (!sender) {
+        log("Start the stream first!");
+        return;
+      }
+      let params = sender.getParameters();
+      log("Video parameters: " + JSON.stringify(params, 0, 2));
+      if (asender) {
+        let aparams = asender.getParameters();
+        log("Audio parameters: " + JSON.stringify(aparams, 0, 2));
+      }
+    }
+
+    document.querySelector('#setParameters').onclick = async () => {
+      if (!sender) {
+        log("Start the stream first!");
+        return;
+      }
+      let params = sender.getParameters();
+      params = readParameters(params);
+      log("Parameters: " + JSON.stringify(params, 0, 2));
+      try {
+        await sender.setParameters(params);
+      } catch (e) {
+        log(e);
+      }
+      params = sender.getParameters();
+      log("Parameters after: " + JSON.stringify(params, 0, 2));
+    }
+
+    document.querySelector('#receiverGetParameters').onclick = async () => {
+      if (!sender) {
+        log("Start the stream first!");
+        return;
+      }
+      let params = pc2.getReceivers()[0].getParameters();
+      log("Receiver Video parameters: " + JSON.stringify(params, 0, 2));
+    }
+
+    document.querySelector('#addLayer').onclick = async () => {
+      let divs = document.querySelectorAll('div[data-layer]');
+      let divCount = divs.length;
+
+      let newDiv = divs[0].cloneNode(true);
+      divs[divCount - 1].insertAdjacentElement("afterend", newDiv);
+      newDiv.dataset.layer = divCount;
+      newDiv.querySelector("span").textContent = divCount;
+
+      if (stream)
+        setupPeerConnection();
+    }
+
+    document.querySelector('#removeLayer').onclick = async () => {
+      let divs = document.querySelectorAll('div[data-layer]');
+      if (divs.length <= 1) return;
+
+      divs[divs.length - 1].remove();
+
+      if (stream)
+        setupPeerConnection();
+    }
+
+    document.querySelector('#splitLayer').onchange = () => {
+      if (stream)
+        setupPeerConnection();
+    }
+
+    document.querySelector('#codec').onchange = () => {
+      if (stream)
+        setupPeerConnection();
+    }
+
+    var setStream = async (video, videoSize, videoFps, stream) => {
+      video.srcObject = stream;
+      video.onloadedmetadata = e => {
+        videoSize.textContent = video.videoWidth + "x" + video.videoHeight;
+      }
+
+      video.onresize = e => {
+        videoSize.textContent = video.videoWidth + "x" + video.videoHeight;
+      }
+
+      intervals.push(window.setInterval(((fpsBox, track) => {
+        fpsBox.textContent = track.getSettings().frameRate.toFixed(1);
+      }).bind(null, videoFps, stream.getTracks()[0]), 1000));
+    }
+
+    var is = (stat, type) => stat.type == type && !stat.isRemote; // skip RTCP
+    var findStat = (map, type) => [...map.values()].find(stat => is(
+      stat,
+      type));
+
+
+    var wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    var log = msg => div.innerHTML += "<pre>" + msg + "</pre>";
+  </script>
+</body>
+
+</html>
