@@ -1,0 +1,264 @@
+<html>
+
+<head>
+  <title>WebRTC Playground</title>
+  <style>
+    body {
+      font-family: monospace;
+    }
+
+    .encodingBox {
+      display: inline-block;
+      border: 1px solid black;
+      margin: 5px 5px 5px 5px;
+      padding: 5px 5px 5px 5px;
+      max-width: 90%;
+    }
+
+    video {
+      max-width: 600px;
+    }
+  </style>
+</head>
+
+<body>
+  <table>
+    <tr>
+      <td>
+        <video id="videoSource" autoplay muted></video>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <span id="videoSourceSize">0x0</span>
+        <span id="videoSourceFps">0</span>
+        fps
+      </td>
+    </tr>
+  </table>
+  <button id="start">Start!</button>
+  <button id="stop">Stop</button>
+  <select id="resolution">
+    <option value="QVGA">320x240 (QVGA)</option>
+    <option value="VGA">640x480 (VGA)</option>
+    <option value="HD">1280x720 (HD)</option>
+    <option value="FullHD">1920x1080 (FullHD)</option>
+    <option value="4K">4096x2160 (4K)</option>
+    <option value="8K">7680x4320 (8K)</option>
+    <option value="screen">Screen</option>
+    <option value="screen-FullHD">Screen (FullHD)</option>
+    <option value="screen-HD">Screen (HD)</option>
+    <option value="screen-conference">Screen (conference)</option>
+    <option value="screen-conference-FullHD">Screen (FullHD, conference)</option>
+    <option value="screen-conference-HD">Screen (HD, conference)</option>
+  </select>
+  |
+  <button id="enumerateDevices">Enumerate</button>
+  <select id="devices">
+  </select>
+  <br>
+  <br>
+  <div>Camera controls |
+    <button id="applyConstraints">Apply</button>
+    <div id="cameraControls"></div>
+  </div>
+  <button id="clearlog">Clear log</button>
+  <br>
+  <div id="div"></div>
+
+  <script>
+    const constraints = {
+      'QVGA': {
+        video: {
+          width: 320,
+          height: 240,
+        },
+      },
+      'VGA': {
+        video: {
+          width: 640,
+          height: 480,
+        },
+      },
+      'HD': {
+        video: {
+          width: 1280,
+          height: 720,
+        },
+      },
+      'FullHD': {
+        video: {
+          width: 1920,
+          height: 1080,
+        },
+      },
+      '4K': {
+        video: {
+          width: 4096,
+          height: 2160,
+        },
+      },
+      '8K': {
+        video: {
+          width: 7680,
+          height: 4320,
+        },
+      },
+    };
+
+    /*
+    const checkControls = (type) => {
+      if (videoSource.srcObject !== null) {
+        const capabilities = videoSource.srcObject.getVideoTracks()[0].getCapabilities();
+        log('Event ' + type + ' has brightness: ' + (capabilities['brightness'] !== undefined ? 'YES' : 'NO'));
+      }
+    };
+
+    videoSource.addEventListener('loadeddata', (e) => checkControls(e.type));
+    videoSource.addEventListener('loadedmetadata', (e) => checkControls(e.type));
+    videoSource.addEventListener('play', (e) => checkControls(e.type));
+    videoSource.addEventListener('timeupdate', (e) => checkControls(e.type));
+    */
+
+    let stream;
+    let streamResolution;
+    const intervals = [];
+
+    const closeStream = () => {
+      for (const track of stream.getVideoTracks()) {
+        track.stop();
+      }
+      stream = null;
+
+      for (const interval of intervals) {
+        window.clearInterval(interval);
+      }
+    };
+
+    document.querySelector('#enumerateDevices').onclick = async () => {
+      const currentDevices = await navigator.mediaDevices.enumerateDevices();
+      devices.innerHTML = '';
+      for (const device of currentDevices) {
+        if (device.kind != 'videoinput') continue;
+
+        const option = document.createElement('option');
+        option.text = device.label;
+        option.value = device.deviceId;
+        devices.appendChild(option);
+      }
+    };
+
+    document.querySelector('#start').onclick = async () => {
+      try {
+        resolutionName = resolution.value;
+        if (stream && streamResolution && streamResolution !=
+          resolutionName) {
+          closeStream();
+        }
+        if (!stream) {
+          const currentConstraints = constraints[resolutionName];
+          if (devices.value !== '') {
+            currentConstraints.video.deviceId = devices.value;
+          }
+
+          stream = await navigator.mediaDevices.getUserMedia(constraints[resolutionName]);
+          streamResolution = resolutionName;
+
+          await setStream(videoSource, videoSourceSize, videoSourceFps, stream);
+          await populateCameraControls(stream.getVideoTracks()[0]);
+        }
+      } catch (e) {
+        log(e);
+      }
+    };
+
+    document.querySelector('#stop').onclick = () => {
+      closeStream();
+    };
+
+    document.querySelector('#applyConstraints').onclick = async () => {
+      const controls = document.querySelectorAll('#cameraControls input, #cameraControls select');
+      const currentSettings = videoSource.srcObject.getVideoTracks()[0].getSettings();
+
+      for (const control of controls) {
+        if (currentSettings[control.id] == undefined || currentSettings[control.id] == control.value) {
+          continue;
+        }
+    
+        const newConstraints = {advanced: []};
+        const value = {};
+        value[control.id] = control.value;
+        newConstraints.advanced.push(value);
+        newConstraints[control.id] = control.value;
+        await videoSource.srcObject.getVideoTracks()[0].applyConstraints(newConstraints);
+      }
+      /* log(JSON.stringify(newConstraints, 0, 2));
+      await videoSource.srcObject.getVideoTracks()[0].applyConstraints(newConstraints);*/
+      log(JSON.stringify(videoSource.srcObject.getVideoTracks()[0].getSettings(), 0, 2));
+    };
+
+    document.querySelector('#clearlog').onclick = () => {
+      div.innerHTML = '';
+    };
+
+    const setStream = async (video, videoSize, videoFps, stream) => {
+      video.srcObject = stream;
+      video.onloadedmetadata = (e) => {
+        videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
+      };
+
+      video.onresize = (e) => {
+        videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
+      };
+
+      intervals.push(window.setInterval(((fpsBox, track) => {
+        fpsBox.textContent = track.getSettings().frameRate.toFixed(
+            1);
+      }).bind(null, videoFps, stream.getTracks()[0]), 1000));
+    };
+
+    const populateCameraControls = async (track) => {
+      await sleep(500);
+
+      const capabilities = track.getCapabilities();
+      const settings = track.getSettings();
+      const blacklist = ['aspectRatio', 'deviceId', 'facingMode', 'frameRate', 'groupId', 'height', 'resizeMode', 'width'];
+
+      for (const controlName in capabilities) {
+        if (blacklist.includes(controlName)) continue;
+
+        cameraControl = document.createElement('label');
+        cameraControl.appendChild(document.createTextNode(controlName + ': '));
+
+        const control = capabilities[controlName];
+        let controlWidget = null;
+    
+        if (control instanceof Array) {
+          controlWidget = document.createElement('select');
+          for (const controlValue of control) {
+            const option = document.createElement('option');
+            option.value = controlValue;
+            option.text = controlValue;
+            controlWidget.appendChild(option);
+          }
+        } else {
+          controlWidget = document.createElement('input');
+          controlWidget.type = 'range';
+          controlWidget.min = control.min;
+          controlWidget.max = control.max;
+          controlWidget.step = control.step;
+        }
+        controlWidget.id = controlName;
+        controlWidget.value = settings[controlName];
+        cameraControl.appendChild(controlWidget);
+        cameraControls.appendChild(cameraControl);
+        cameraControls.appendChild(document.createElement('br'));
+      }
+    };
+
+    const log = (msg) => div.innerHTML += '<pre>' + msg + '</pre>';
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  </script>
+</body>
+
+</html>
