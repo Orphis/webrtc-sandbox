@@ -1,0 +1,20 @@
+{
+  "name": "webrtc-sandbox",
+  "version": "1.0.0",
+  "description": "Test applications for WebRTC various web APIs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Orphis/webrtc-sandbox.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Orphis/webrtc-sandbox/issues"
+  },
+  "homepage": "https://github.com/Orphis/webrtc-sandbox#readme",
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-html": "^6.0.0"
+  }
+}
