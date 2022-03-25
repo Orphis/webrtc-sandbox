@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/Orphis/webrtc-sandbox#readme",
   "devDependencies": {
-    "eslint": "^6.8.0",
+    "eslint": "^8.11.0",
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-html": "^6.0.0"
   }
