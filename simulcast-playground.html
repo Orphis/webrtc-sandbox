@@ -126,7 +126,7 @@
       <label
         >scalabilityMode:
         <select id="scalabilityMode">
-          <option value="none">None</option>
+          <option value="">None</option>
           <option value="L1T1">L1T1</option>
           <option value="L1T2">L1T2</option>
           <option value="L1T3">L1T3</option>
@@ -185,7 +185,7 @@
     <label
       >degradationPreference:
       <select id="degradationPreference">
-        <option value="none" selected>None</option>
+        <option value="" selected>None</option>
         <option value="balanced">Balanced</option>
         <option value="maintain-framerate">Maintain framerate</option>
         <option value="maintain-resolution">Maintain resolution</option>
@@ -618,9 +618,7 @@
 
           const maxBitrate = div.querySelector('#maxBitrate').valueAsNumber;
           if (isNaN(maxBitrate)) {
-            if (params.encodings[i].maxBitrate !== undefined) {
-              delete params.encodings[i].maxBitrate;
-            }
+            params.encodings[i].maxBitrate = undefined;
           } else {
             params.encodings[i].maxBitrate = maxBitrate;
           }
@@ -629,27 +627,21 @@
               '#scaleResolutionDownBy',
           ).valueAsNumber;
           if (isNaN(scaleResolutionDownBy)) {
-            if (params.encodings[i].scaleResolutionDownBy !== undefined) {
-              delete params.encodings[i].scaleResolutionDownBy;
-            }
+            params.encodings[i].scaleResolutionDownBy = undefined;
           } else {
             params.encodings[i].scaleResolutionDownBy = scaleResolutionDownBy;
           }
 
           const maxFramerate = div.querySelector('#maxFramerate').valueAsNumber;
           if (isNaN(maxFramerate)) {
-            if (params.encodings[i].maxFramerate !== undefined) {
-              delete params.encodings[i].maxFramerate;
-            }
+            params.encodings[i].maxFramerate = undefined;
           } else {
             params.encodings[i].maxFramerate = maxFramerate;
           }
 
           const scalabilityMode = div.querySelector('#scalabilityMode').value;
-          if (scalabilityMode == 'none') {
-            if (params.encodings[i].scalabilityMode !== undefined) {
-              delete params.encodings[i].scalabilityMode;
-            }
+          if (scalabilityMode == '') {
+            params.encodings[i].scalabilityMode = undefined;
           } else {
             params.encodings[i].scalabilityMode = scalabilityMode;
           }
@@ -657,7 +649,9 @@
         const degradationPreferenceChoice = document.querySelector(
             '#degradationPreference',
         ).value;
-        if (degradationPreferenceChoice != 'none') {
+        if (degradationPreferenceChoice == '') {
+          params.degradationPreference = undefined;
+        } else {
           params.degradationPreference = degradationPreferenceChoice;
         }
 
@@ -779,7 +773,7 @@
         params = readParameters(params);
         log(
             'Setting encoding parameters: ' +
-            JSON.stringify(params.encodings, 0, 2) +
+            JSON.stringify(params.encodings, (k, v) => v === undefined ? null : v, 2) +
             '\ndegradationPreference: ' +
             params.degradationPreference,
         );
