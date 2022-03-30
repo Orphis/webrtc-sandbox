@@ -777,7 +777,12 @@
         }
         let params = sender.getParameters();
         params = readParameters(params);
-        log('Setting encoding parameters: ' + JSON.stringify(params.encodings, 0, 2) + '\ndegradationPreference: ' + params.degradationPreference);
+        log(
+            'Setting encoding parameters: ' +
+            JSON.stringify(params.encodings, 0, 2) +
+            '\ndegradationPreference: ' +
+            params.degradationPreference,
+        );
         try {
           await sender.setParameters(params);
         } catch (e) {
