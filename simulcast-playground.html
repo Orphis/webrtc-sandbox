@@ -783,7 +783,7 @@
         const divs = document.querySelectorAll('div[data-layer]');
         const divCount = divs.length;
         for (let i = 0; params.has('encodings.' + i + '.rid'); ++i) {
-          if (i - 1 > divCount) {
+          if (i + 1 > divCount) {
             document.querySelector('#addLayer').click();
           }
           const div = document.querySelector('div[data-layer="' + i + '"]');
