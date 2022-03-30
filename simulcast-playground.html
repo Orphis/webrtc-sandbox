@@ -97,6 +97,8 @@
       <option value="split">Split layers</option>
     </select>
     <br />
+    <button id="copyBookmark">Copy Bookmark</button>
+    <br />
     <div class="encodingBox" data-layer="0">
       Layer
       <span id="layerId">0</span> <span id="videoSize">0x0</span>
@@ -743,6 +745,55 @@
         }
       };
 
+      const _serializeSetting = (settingName, settingValue) => {
+        if (typeof settingValue === 'object') {
+          return Object.keys(settingValue).map((key) => {
+            return _serializeSetting(settingName + '.' + key, settingValue[key]);
+          }).join('&');
+        }
+        return encodeURIComponent(settingName) + '=' + (settingValue ? encodeURIComponent(settingValue) : '');
+      };
+
+      const serializeSettings = () => {
+        const settings = {
+          'resolution': resolution.value,
+          'captureFramerate': captureFramerate.value,
+          'codec': codec.value,
+          'contentHint': contentHint.value,
+          'encodings': readParameters().encodings,
+          'degradationPreference': degradationPreference.value,
+        };
+        const queryString = Object.keys(settings).map((key) => {
+          return _serializeSetting(key, settings[key]);
+        }).join('&');
+        console.log('Parameter string: ' + queryString);
+        return queryString;
+      };
+
+      const restoreSettings = (queryString) => {
+        const params = new URLSearchParams(queryString);
+        resolution.value = params.get('resolution');
+        captureFramerate.value = params.get('captureFramerate');
+        codec.value = params.get('codec');
+        contentHint.value = params.get('contentHint');
+        degradationPreference.value = params.get('degradationPreference');
+
+        const divs = document.querySelectorAll('div[data-layer]');
+        const divCount = divs.length;
+        for (let i = 0; params.has('encodings.' + i + '.rid'); ++i) {
+          if (i - 1 > divCount) {
+            document.querySelector('#addLayer').click();
+          }
+          const div = document.querySelector('div[data-layer="' + i + '"]');
+          div.querySelector('#maxBitrate').value = params.get('encodings.' + i + '.maxBitrate');
+          div.querySelector('#scaleResolutionDownBy').value = params.get('encodings.' + i + '.scaleResolutionDownBy');
+          div.querySelector('#maxFramerate').value = params.get('encodings.' + i + '.maxFramerate');
+          div.querySelector('#scalabilityMode').value = params.get('encodings.' + i + '.scalabilityMode') ?? 'none';
+          div.querySelector('#active').value = params.get('encodings.' + i + '.active') == 'true' ? 'on' : 'off';
+          div.querySelector('#priority').value = params.get('encodings.' + i + '.priority');
+        }
+      };
+
       document.querySelector('#stop').onclick = () => {
         for (const track of stream.getVideoTracks()) {
           track.stop();
@@ -818,6 +869,12 @@
         }
       };
 
+      document.querySelector('#copyBookmark').onclick = async () => {
+        const url = location.origin + location.pathname + '?' + serializeSettings();
+        await navigator.clipboard.writeText(url);
+        log('Copied to clipboard: ' + url);
+      };
+
       document.querySelector('#splitLayer').onchange = () => {
         if (stream) {
           setupPeerConnection();
@@ -859,6 +916,10 @@
         pre.innerText = msg;
         div.appendChild(pre);
       };
+
+      if (window.location.search.length > 1) {
+        restoreSettings(window.location.search);
+      }
     </script>
   </body>
 </html>
