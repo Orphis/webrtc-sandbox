@@ -860,7 +860,11 @@
       const findStat = (map, type) =>
         [...map.values()].find((stat) => is(stat, type));
 
-      const log = (msg) => (div.innerHTML += '<pre>' + msg + '</pre>');
+      const log = (msg) => {
+        const pre = document.createElement('pre');
+        pre.innerText = msg;
+        div.appendChild(pre);
+      };
     </script>
   </body>
 </html>
