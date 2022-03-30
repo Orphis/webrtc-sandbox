@@ -762,6 +762,7 @@
           'contentHint': contentHint.value,
           'encodings': readParameters().encodings,
           'degradationPreference': degradationPreference.value,
+          'splitLayer': splitLayer.value,
         };
         const queryString = Object.keys(settings).map((key) => {
           return _serializeSetting(key, settings[key]);
@@ -777,6 +778,7 @@
         codec.value = params.get('codec');
         contentHint.value = params.get('contentHint');
         degradationPreference.value = params.get('degradationPreference');
+        splitLayer.value = params.get('splitLayer');
 
         const divs = document.querySelectorAll('div[data-layer]');
         const divCount = divs.length;
