@@ -86,6 +86,9 @@
       <option value="detail">Detail</option>
       <option value="text">Text</option>
     </select>
+    </select>
+      <select id="captureDevice">
+    </select>
     |
     <button id="getParameters">Get parameters</button>
     <button id="setParameters">Set parameters</button> |
@@ -271,6 +274,38 @@
       let lastBytesReceived;
       let streamResolution;
       const intervals = [];
+
+      function listDevices(deviceInfos) {
+        var devices = document.getElementById("captureDevice");
+
+        for (let i = 0; i !== deviceInfos.length; ++i) {
+          let deviceInfo = deviceInfos[i];
+          if (deviceInfo.kind === 'videoinput') {
+            var option = document.createElement("option");
+            option.value = deviceInfo.deviceId;
+            option.text = deviceInfo.label
+            devices.add(option);
+            console.log('got device: ' + deviceInfo.text);
+          }
+        }
+      }
+
+      (function() {
+        // Enumerate devices in order to populate dropdown, but then stop
+        // any active tracks.
+        navigator.mediaDevices.getUserMedia({audio: false, video: true})
+          .then((mediaStream) => {
+            navigator.mediaDevices.enumerateDevices()
+                .then(listDevices)
+
+            mediaStream.getTracks().forEach(function(track) {
+              track.stop();
+            });
+        })
+        .catch((error) => {
+            console.error('getUserMedia error!', error);
+        });
+      })();
 
       const stopPeerConnection = () => {
         if (pc1) {
@@ -722,6 +757,7 @@
           if (!stream) {
             const constraint = {...constraints[resolutionName]};
             constraint.video.frameRate = captureFramerate.value;
+            constraint.video.deviceId = { exact: captureDevice.value };
             if (resolutionName.includes('screen')) {
               stream = await navigator.mediaDevices.getDisplayMedia(constraint);
             } else {
