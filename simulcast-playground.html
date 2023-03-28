@@ -296,6 +296,8 @@
         }
       };
 
+      const removeTilde = (r) => r.startsWith('~') ? r.substring(1) : r;
+
       const setupPeerConnection = async () => {
         stopPeerConnection();
 
@@ -470,7 +472,7 @@
 
         sdpLines = sdpLines.map((line) => {
           if (line.startsWith('a=group:BUNDLE')) {
-            return 'a=group:BUNDLE ' + layerRIDS.join(' ');
+            return 'a=group:BUNDLE ' + layerRIDS.map(removeTilde).join(' ');
           }
 
           return line;
@@ -480,11 +482,11 @@
           sdpLines = sdpLines.concat(
               mSection.map((line) => {
                 if (line.match(/a=msid:/)) {
-                  return 'a=msid:' + layerName + ' ' + layerName;
+                  return 'a=msid:' + removeTilde(layerName) + ' ' + removeTilde(layerName);
                 }
 
                 if (line.startsWith('a=mid:')) {
-                  return 'a=mid:' + layerName;
+                  return 'a=mid:' + removeTilde(layerName);
                 }
 
                 if (line.startsWith('a=extmap:' + midExtmapId + ' ')) {
@@ -503,10 +505,7 @@
                   );
                 }
 
-                if (
-                  line.startsWith('a=rid:') ||
-                line.startsWith('a=simulcast:')
-                ) {
+                if (line.startsWith('a=rid:') || line.startsWith('a=simulcast:')) {
                   return null;
                 }
 
@@ -581,7 +580,7 @@
           mSection.push('a=rid:' + index + ' recv');
         }
         mSection.push(
-            'a=simulcast:recv ' + Array.from(params.encodings.keys()).join(';'),
+            'a=simulcast:recv ' + params.encodings.map((e, k) => (e.active ? '' : '~') + k).join(';'),
         );
 
         answer.sdp =
