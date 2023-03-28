@@ -397,9 +397,10 @@
             sdp: pc1.localDescription.sdp,
           };
 
+          let encodingActiveStatus = null;
           if (splitLayer.value == 'split') {
             if (pc1Offer.sdp.includes('a=simulcast:')) {
-              splitUnifiedPlanOffer(pc2Offer);
+              encodingActiveStatus = splitUnifiedPlanOffer(pc2Offer);
             }
           }
 
@@ -414,7 +415,7 @@
           };
           if (splitLayer.value == 'split') {
             if (pc1Offer.sdp.includes('a=simulcast:')) {
-              splitUnifiedPlanAnswer(pc1Answer);
+              splitUnifiedPlanAnswer(pc1Answer, encodingActiveStatus);
             }
           }
 
@@ -446,15 +447,30 @@
         lastBytesReceived = 0;
       };
 
+      // Modifies `offer.sdp` and returns a `bool[]` indicating RID active
+      // status.
       const splitUnifiedPlanOffer = (offer) => {
         let sdpLines = offer.sdp.split('\r\n');
 
         mSectionStart = sdpLines.findIndex((line) => line.startsWith('m='));
         mSection = sdpLines.splice(mSectionStart);
 
+        // Parse out the list of RIDs.
         const layerRIDS = mSection
             .filter((line) => line.startsWith('a=simulcast:'))
             .map((line) => line.replace('a=simulcast:send ', '').split(';'))[0];
+        // RIDs are prefixed with ~ if negotiated as inactive. Remove this, we
+        // only want the RIDs. We still need to remember ~ for the SDP answer
+        // later, see https://github.com/w3c/webrtc-pc/issues/2848.
+        let encodingActiveStatus = [];
+        for (let i = 0; i < layerRIDS.length; ++i) {
+          let active = layerRIDS[i].indexOf('~') == -1;
+          if (!active) {
+            layerRIDS[i] = layerRIDS[i].replace('~', '');
+          }
+          encodingActiveStatus.push(active);
+        }
+        console.log(encodingActiveStatus);
 
         const midExtmapId = mSection
             .filter((line) =>
@@ -518,9 +534,10 @@
         offer.sdp =
           sdpLines.filter((line) => line && line.length > 0).join('\r\n') +
           '\r\n';
+        return encodingActiveStatus;
       };
 
-      const splitUnifiedPlanAnswer = (answer) => {
+      const splitUnifiedPlanAnswer = (answer, encodingActiveStatus) => {
         let sdpLines = answer.sdp.split('\r\n');
 
         let mSectionStart = sdpLines.findIndex((line) => line.startsWith('m='));
@@ -577,11 +594,20 @@
         });
 
         const params = readParameters();
+        console.log(params);
         for (const [index] of params.encodings.entries()) {
           mSection.push('a=rid:' + index + ' recv');
         }
+        const ridsWithTildes = Array.from(params.encodings.keys());
+        if (ridsWithTildes.length == encodingActiveStatus.length) {
+          for (let i = 0; i < ridsWithTildes.length; ++i) {
+            if (!encodingActiveStatus[i]) {
+              ridsWithTildes[i] = '~' + ridsWithTildes[i];
+            }
+          }
+        }
         mSection.push(
-            'a=simulcast:recv ' + Array.from(params.encodings.keys()).join(';'),
+            'a=simulcast:recv ' + ridsWithTildes.join(';'),
         );
 
         answer.sdp =
