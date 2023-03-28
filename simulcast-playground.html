@@ -460,8 +460,8 @@
             .filter((line) => line.startsWith('a=simulcast:'))
             .map((line) => line.replace('a=simulcast:send ', '').split(';'))[0];
         // RIDs are prefixed with ~ if negotiated as inactive. Remove this, we
-        // only want the RIDs. We still need to remember ~ for the SDP answer
-        // later, see https://github.com/w3c/webrtc-pc/issues/2848.
+        // only want the RIDs. But we still need to remember ~ for the SDP
+        // answer later, see https://github.com/w3c/webrtc-pc/issues/2848.
         let encodingActiveStatus = [];
         for (let i = 0; i < layerRIDS.length; ++i) {
           let active = layerRIDS[i].indexOf('~') == -1;
@@ -470,7 +470,6 @@
           }
           encodingActiveStatus.push(active);
         }
-        console.log(encodingActiveStatus);
 
         const midExtmapId = mSection
             .filter((line) =>
