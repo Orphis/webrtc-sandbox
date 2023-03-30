@@ -530,7 +530,7 @@
             .slice(1)
             .findIndex((line) => line.startsWith('m='));
         if (mSectionStart != -1) {
-          mSection.splice(mSectionStart);
+          mSection.splice(mSectionStart + 1);
         }
 
         const midExtmapId = mSection
