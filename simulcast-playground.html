@@ -4,6 +4,7 @@
     <style>
       body {
         font-family: monospace;
+        line-height: 2em;
       }
 
       .encodingBox {
@@ -16,6 +17,10 @@
 
       video {
         max-width: 600px;
+      }
+
+      button, input, select {
+        font-family: inherit;
       }
     </style>
   </head>
@@ -45,8 +50,15 @@
         <td id="videoMergedBps">0 bps</td>
       </tr>
     </table>
-    <button id="start">Start!</button>
-    <button id="stop">Stop</button>
+    <button id="start">Start</button>
+    <button id="stop">Stop</button> | 
+    <button id="copyBookmark">Copy Bookmark</button>
+    <button id="copyBookmarkWithDevice">Copy Bookmark (+device)</button>
+    <br />
+    Source: 
+    <select id="captureDevice">
+      <option value="default">Default Device</option>
+    </select>
     <select id="resolution">
       <option value="QVGA">320x240 (QVGA)</option>
       <option value="HVGA">480x270 (HVGA)</option>
@@ -74,30 +86,42 @@
       <option value="30" selected>30 FPS</option>
       <option value="60">60 FPS</option>
     </select>
-    <select id="codec">
-      <option value="VP8">VP8</option>
-      <option value="VP9">VP9</option>
-      <option value="AV1">AV1</option>
-      <option value="H264">H264</option>
-    </select>
     <select id="contentHint">
       <option value="">No Hint</option>
       <option value="motion">Motion</option>
       <option value="detail">Detail</option>
       <option value="text">Text</option>
     </select>
-    |
-    <button id="getParameters">Get parameters</button>
-    <button id="setParameters">Set parameters</button> |
-    <button id="receiverGetParameters">Receiver Get parameters</button> |
+    <br />
+    Transceiver:
+    <select id="codec">
+      <option value="VP8">VP8</option>
+      <option value="VP9">VP9</option>
+      <option value="AV1">AV1</option>
+      <option value="H264">H264</option>
+    </select> |
+    Sender:
+    <button id="getParameters">Get Parameters</button>
+    <button id="setParameters">Set Parameters</button> | Receiver:
+    <button id="receiverGetParameters">Get Parameters</button>
+    <br />
+    Simulcast:
     <button id="addLayer">Add layer</button>
-    <button id="removeLayer">Remove layer</button>
+    <button id="removeLayer">Remove layer</button> | Layers:
     <select id="splitLayer">
-      <option value="merged">Merged layers</option>
-      <option value="split">Split layers</option>
+      <option value="merged">Merged</option>
+      <option value="split">Split</option>
     </select>
     <br />
-    <button id="copyBookmark">Copy Bookmark</button>
+    <label
+      >Degradation Preference:
+      <select id="degradationPreference">
+        <option value="" selected>None</option>
+        <option value="balanced">Balanced</option>
+        <option value="maintain-framerate">Maintain framerate</option>
+        <option value="maintain-resolution">Maintain resolution</option>
+      </select>
+    </label>
     <br />
     <div class="encodingBox" data-layer="0">
       Layer
@@ -112,22 +136,22 @@
       <br />
       <label
         >maxBitrate (bps):
-        <input type="number" id="maxBitrate" value="3000000" size="8" />
+        <input type="number" id="maxBitrate" value="3000000" size="8" style="width: 8em;" />
       </label>
       <br />
       <label
         >scaleResolutionDownBy:
-        <input type="number" id="scaleResolutionDownBy" value="1" size="3" />
+        <input type="number" id="scaleResolutionDownBy" value="1" size="3"  style="width: 5em;" />
       </label>
       <br />
       <label
         >maxFramerate (fps):
-        <input type="number" id="maxFramerate" value="60" size="3" />
+        <input type="number" id="maxFramerate" value="60" size="3" style="width: 7em;" />
       </label>
       <br />
       <label
         >scalabilityMode:
-        <select id="scalabilityMode">
+        <select id="scalabilityMode" style="width: 9em;">
           <option value="">None</option>
           <option value="L1T1">L1T1</option>
           <option value="L1T2">L1T2</option>
@@ -188,16 +212,6 @@
       </label>
       <br />
     </div>
-    <br />
-    <label
-      >degradationPreference:
-      <select id="degradationPreference">
-        <option value="" selected>None</option>
-        <option value="balanced">Balanced</option>
-        <option value="maintain-framerate">Maintain framerate</option>
-        <option value="maintain-resolution">Maintain resolution</option>
-      </select>
-    </label>
     <br />
     <div id="div"></div>
 
@@ -275,6 +289,7 @@
       let lastBytesSent;
       let lastBytesReceived;
       let streamResolution;
+      let bookmarkDevice;
       const intervals = [];
 
       const stopPeerConnection = () => {
@@ -729,6 +744,9 @@
             if (resolutionName.includes('screen')) {
               stream = await navigator.mediaDevices.getDisplayMedia(constraint);
             } else {
+              if (captureDevice.value !== 'default') {
+                constraint.video.deviceId = {exact: captureDevice.value};
+              }
               stream = await navigator.mediaDevices.getUserMedia(constraint);
             }
             streamResolution = resolutionName;
@@ -758,7 +776,7 @@
         return encodeURIComponent(settingName) + '=' + (settingValue ? encodeURIComponent(settingValue) : '');
       };
 
-      const serializeSettings = () => {
+      const serializeSettings = (includeDeviceId) => {
         const settings = {
           'resolution': resolution.value,
           'captureFramerate': captureFramerate.value,
@@ -768,6 +786,9 @@
           'degradationPreference': degradationPreference.value,
           'splitLayer': splitLayer.value,
         };
+        if (includeDeviceId) {
+          settings['device'] = captureDevice.value;
+        }
         const queryString = Object.keys(settings).map((key) => {
           return _serializeSetting(key, settings[key]);
         }).join('&');
@@ -778,6 +799,7 @@
       const restoreSettings = (queryString) => {
         const params = new URLSearchParams(queryString);
         resolution.value = params.get('resolution');
+        bookmarkDevice = params.get('device');
         captureFramerate.value = params.get('captureFramerate');
         codec.value = params.get('codec');
         contentHint.value = params.get('contentHint');
@@ -876,7 +898,13 @@
       };
 
       document.querySelector('#copyBookmark').onclick = async () => {
-        const url = location.origin + location.pathname + '?' + serializeSettings();
+        const url = location.origin + location.pathname + '?' + serializeSettings(false);
+        await navigator.clipboard.writeText(url);
+        log('Copied to clipboard: ' + url);
+      };
+
+      document.querySelector('#copyBookmarkWithDevice').onclick = async () => {
+        const url = location.origin + location.pathname + '?' + serializeSettings(true);
         await navigator.clipboard.writeText(url);
         log('Copied to clipboard: ' + url);
       };
@@ -926,6 +954,32 @@
       if (window.location.search.length > 1) {
         restoreSettings(window.location.search);
       }
+
+      (async () => {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: true,
+        });
+
+        const deviceInfos = await navigator.mediaDevices.enumerateDevices();
+        const captureDevice = document.querySelector('#captureDevice');
+        for (const deviceInfo of deviceInfos) {
+          if (deviceInfo.kind !== 'videoinput') continue;
+
+          const option = document.createElement('option');
+          option.value = deviceInfo.deviceId;
+          option.text = deviceInfo.label;
+          captureDevice.appendChild(option);
+        }
+
+        for (const track of mediaStream.getTracks()) {
+          track.stop();
+        }
+
+        if (bookmarkDevice) {
+          captureDevice.value = bookmarkDevice;
+        }
+      })();
     </script>
   </body>
 </html>
