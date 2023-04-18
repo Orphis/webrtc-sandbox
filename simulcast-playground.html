@@ -139,6 +139,13 @@
       </div>
       <br />
       <label
+        >codec:
+        <select id="forceCodec" style="width: 10em">
+          <option value="">None</option>
+        </select>
+      </label>
+      <br />
+      <label
         >maxBitrate (bps):
         <input type="number" id="maxBitrate" value="3000000" size="8" style="width: 8em;" />
       </label>
@@ -493,9 +500,6 @@
         pc1.oniceconnectionstatechange = (e) => log(pc1.iceConnectionState);
         pc1.onnegotiationneeded = async (e) => {
           let pc1Offer = await pc1.createOffer();
-          if (!transceiver.setCodecPreferences) {
-            pc1Offer = filterCodecs(pc1Offer);
-          }
           if (resolution.value.includes('-conference')) {
             pc1Offer = addConferenceFlag(pc1Offer);
           }
@@ -543,12 +547,14 @@
         });
         sender = transceiver.sender;
 
-        if (transceiver.setCodecPreferences) {
-          const codecs = RTCRtpSender.getCapabilities('video').codecs.filter(
-              (c) => c.mimeType.includes(codec.value),
-          );
-          transceiver.setCodecPreferences(codecs);
-        }
+        // Move the desired codecs in front
+        const wantedCodecs = RTCRtpSender.getCapabilities(
+          "video"
+        ).codecs.filter((c) => c.mimeType.includes(codec.value));
+        const otherCodecs = RTCRtpSender.getCapabilities("video").codecs.filter(
+          (c) => !c.mimeType.includes(codec.value)
+        );
+        transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));
 
         lastBitrateMesurementTime = performance.now();
         lastBytesSent = 0;
@@ -758,6 +764,13 @@
           } else {
             params.encodings[i].scalabilityMode = scalabilityMode;
           }
+
+          const forceCodec = div.querySelector("#forceCodec").value;
+          if (forceCodec == "") {
+            params.encodings[i].codec = undefined;
+          } else {
+            params.encodings[i].codec = JSON.parse(forceCodec);
+          }
         }
         const degradationPreferenceChoice = document.querySelector(
             '#degradationPreference',
@@ -769,52 +782,6 @@
         }
 
         return params;
-      };
-
-      const filterCodecs = (offer) => {
-        let sdpLines = offer.sdp.split('\r\n');
-        let codecs = [];
-
-        // Robust parsing
-        codecs = sdpLines
-            .filter((l) => l.startsWith('a=rtpmap:') && l.includes(codec.value))
-            .map((l) => l.split(':')[1].split(' ')[0]);
-
-        console.log('Keeping codec pt: ' + codecs.join(' '));
-
-        sdpLines = sdpLines
-            .filter((l) => {
-              if (
-                l.startsWith('a=rtpmap:') &&
-              !codecs.includes(l.split(':')[1].split(' ')[0])
-              ) {
-                return false;
-              }
-              if (
-                l.startsWith('a=rtcp-fb:') &&
-              !codecs.includes(l.split(':')[1].split(' ')[0])
-              ) {
-                return false;
-              }
-              if (
-                l.startsWith('a=fmtp:') &&
-              !codecs.includes(l.split(':')[1].split(' ')[0])
-              ) {
-                return false;
-              }
-              return true;
-            })
-            .map((l) => {
-              if (l.startsWith('m=')) {
-                return l.split(' ', 3).concat(codecs).join(' ');
-              }
-              return l;
-            });
-
-        return {
-          type: offer.type,
-          sdp: sdpLines.join('\r\n'),
-        };
       };
 
       document.querySelector('#start').onclick = async () => {
@@ -911,6 +878,21 @@
           div.querySelector('#scalabilityMode').value = params.get('encodings.' + i + '.scalabilityMode') ?? 'none';
           div.querySelector('#active').value = params.get('encodings.' + i + '.active') == 'true' ? 'on' : 'off';
           div.querySelector('#priority').value = params.get('encodings.' + i + '.priority');
+          const codecObject = {
+            clockRate: parseInt(params.get('encodings.' + i + '.codec.clockRate')),
+            mimeType: params.get('encodings.' + i + '.codec.mimeType'),
+            sdpFmtpLine: params.get('encodings.' + i + '.codec.sdpFmtpLine') ?? undefined,
+          };
+          for (const option of div.querySelector('#forceCodec').options) {
+            if (option.value === '') continue;
+            const optionCodec = JSON.parse(option.value);
+            if (optionCodec.mimeType !== codecObject.mimeType) continue;
+            if (optionCodec.clockRate !== codecObject.clockRate) continue;
+            if (optionCodec.sdpFmtpLine !== codecObject.sdpFmtpLine) continue;
+
+            div.querySelector('#forceCodec').value = JSON.stringify(codecObject);
+            break;
+          }
         }
       };
 
@@ -1043,11 +1025,26 @@
         div.appendChild(pre);
       };
 
+      const forceCodec = document.querySelector("#forceCodec");
+      const skipCodecs = ["video/red", "video/rtx", "video/ulpfec"];
+      for (const codec of RTCRtpSender.getCapabilities("video").codecs) {
+        if (skipCodecs.includes(codec.mimeType)) continue;
+
+        const option = document.createElement("option");
+        option.value = JSON.stringify(codec);
+        option.text = codec.mimeType.split("/")[1];
+        if (codec.sdpFmtpLine) {
+          option.text += " / " + codec.sdpFmtpLine;
+        }
+        forceCodec.appendChild(option);
+      }
+
       if (window.location.search.length > 1) {
         restoreSettings(window.location.search);
       }
 
       (async () => {
+        // Enumerate all devices
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: true,
@@ -1068,6 +1065,7 @@
           track.stop();
         }
 
+        // Restore saved device
         if (bookmarkDevice) {
           captureDevice.value = bookmarkDevice;
         }
