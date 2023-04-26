@@ -60,8 +60,12 @@
       <option value="default">Default Device</option>
     </select>
     <select id="resolution">
+      <option value="WHQVGA">240x135 (WHQVGA)</option>
+      <option value="WQVGA">320x180 (WQVGA)</option>
       <option value="QVGA">320x240 (QVGA)</option>
-      <option value="HVGA">480x270 (HVGA)</option>
+      <option value="WHVGA">480x270 (WHVGA)</option>
+      <option value="HVGA">480x360 (HVGA)</option>
+      <option value="WVGA">640x360 (WVGA)</option>
       <option value="VGA">640x480 (VGA)</option>
       <option value="HD">1280x720 (HD)</option>
       <option value="FullHD">1920x1080 (FullHD)</option>
@@ -217,16 +221,40 @@
 
     <script>
       const constraints = {
+        'WHQVGA': {
+          video: {
+            width: 240,
+            height: 135,
+          },
+        },
+        'WQVGA': {
+          video: {
+            width: 320,
+            height: 180,
+          },
+        },
         'QVGA': {
           video: {
             width: 320,
             height: 240,
           },
         },
-        'HVGA': {
+        'WHVGA': {
           video: {
             width: 480,
             height: 270,
+          },
+        },
+        'HVGA': {
+          video: {
+            width: 480,
+            height: 360,
+          },
+        },
+        'WVGA': {
+          video: {
+            width: 640,
+            height: 360,
           },
         },
         'VGA': {
