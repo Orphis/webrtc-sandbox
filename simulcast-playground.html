@@ -214,6 +214,7 @@
           <option value="high">High</option>
         </select>
       </label>
+      <span id="stats"></span>
       <br />
     </div>
     <br />
@@ -318,6 +319,7 @@
       let lastBytesReceived;
       let streamResolution;
       let bookmarkDevice;
+      let prevReport = null;
       const intervals = [];
 
       const stopPeerConnection = () => {
@@ -350,6 +352,66 @@
         pc2 = new RTCPeerConnection({
           sdpSemantics: 'unified-plan',
         });
+
+
+        const refreshEncodingStats = (currReport) => {
+          const encodings = sender.getParameters().encodings;
+          for (let layerId = 0; layerId < encodings.length; ++layerId) {
+            const statsSpan = document.querySelector(
+              'div[data-layer="' + layerId + '"]',
+            ).querySelector('#stats');
+
+            try {
+              const currRtp = [...currReport.values()].find(s => {
+                return s.type == 'outbound-rtp' &&
+                      (s.rid == undefined || s.rid == layerId);
+              });
+              const prevRtp =
+                  currRtp && prevReport && prevReport.get(currRtp.id);
+              if (!currRtp || !prevRtp) {
+                statsSpan.innerText = "\n\nStats missing";
+                continue;
+              }
+              const deltaSeconds =
+                  (currRtp.timestamp - prevRtp.timestamp) / 1000;
+
+              const targetBitrateKbps =
+                  currRtp.targetBitrate ? currRtp.targetBitrate / 1000 : 0;
+              const encoderKbps =
+                  (delta(currRtp, prevRtp,
+                        s => s.bytesSent - s.retransmittedBytesSent) * 8 / 1000)
+                        / deltaSeconds;
+              const avgEncodeTimeMs =
+                  (delta(currRtp, prevRtp, s => s.totalEncodeTime) /
+                    delta(currRtp, prevRtp, s => s.framesEncoded)) * 1000;
+              const avgQp =
+                  delta(currRtp, prevRtp, s => s.qpSum) /
+                  delta(currRtp, prevRtp, s => s.framesEncoded);
+
+              statsSpan.innerText = `
+
+                ${currReport.get(currRtp.codecId).mimeType.substring(6)} (${currRtp.encoderImplementation})
+                scalabilityMode: ${currRtp.scalabilityMode}
+                Limitation: ${currRtp.qualityLimitationReason}
+
+                Target: ${targetBitrateKbps.toFixed(2)} kbps
+                Actual: ${encoderKbps.toFixed(2)} kbps
+                - Avg Enc Time: ${avgEncodeTimeMs.toFixed(2)} ms
+                - Avg QP: ${avgQp}
+                - Keyframes: ${currRtp.keyFramesEncoded}`;
+            } catch (e) {
+              statsSpan.innerText = e;
+            }
+          }
+        }
+        const delta = (currStats, prevStats, calc) => {
+          return calc(currStats) - calc(prevStats);
+        }
+        intervals.push(setInterval(async () => {
+          const currReport = await pc1.getStats();
+          refreshEncodingStats(currReport);
+          prevReport = currReport;
+        }, 1000));
 
         pc1.onicecandidate = (e) => {
           if (e.candidate) {
@@ -398,6 +460,8 @@
                   ]);
                   const currentTime = performance.now();
                   const deltaTime = currentTime - lastBitrateMesurementTime;
+                  // FIXME: Instead of picking a random RTP stream, aggregate
+                  // the bytesSent for all RTP streams.
                   const bytesSent = findStat(s1, 'outbound-rtp').bytesSent;
                   let bytesReceived;
                   try {
