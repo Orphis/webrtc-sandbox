@@ -138,7 +138,8 @@
         <span id="videoBrInfo"></span>
       </div>
       <br />
-      <button id="record">record</button>
+      <button type="button" id="buttonStart">Start Recording</button>
+      <button type="button" id="buttonStop" disabled>Stop Recording</button>
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -227,6 +228,9 @@
     </div>
     <br />
     <div id="div"></div>
+    <div>
+      <video controls playsinline id="videoRecorded"></video>
+    </div>
 
     <script>
       const constraints = {
@@ -784,6 +788,28 @@
 
         return params;
       };
+
+      document.querySelector('#buttonStart').onclick = async () => {    
+        const videoRecorded = document.querySelector('#videoRecorded')
+
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'video/webm',
+        })
+        
+        mediaRecorder.start()
+        buttonStart.setAttribute('disabled', '')
+        buttonStop.removeAttribute('disabled')
+
+        document.querySelector('#buttonStop').onclick = async () => {
+            mediaRecorder.stop()
+            buttonStart.removeAttribute('disabled')
+            buttonStop.setAttribute('disabled', '')
+          }
+
+          mediaRecorder.addEventListener('dataavailable', event => {
+            videoRecorded.src = URL.createObjectURL(event.data)
+          })
+        }
 
       document.querySelector('#start').onclick = async () => {
         try {
