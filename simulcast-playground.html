@@ -1020,16 +1020,12 @@
         try{
           const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
           startWebCamera(stream); //let's make sure the camera works
-        } catch (err){
-          console.log("error: " + err);
-        }
+        } catch (err){ console.log("Error getting media device: " + err); }
       }
 
-      //start web camera
-      function startWebCamera(){
+      function startWebCamera(){ //start web camera
         video.srcObject = stream;
         window.stream = stream;
-        video.play();
       }
 
       const setStream = async (video, videoSize, videoFps, stream) => {
