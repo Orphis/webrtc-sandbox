@@ -1010,10 +1010,24 @@
       };
 
       //set here the video recording
+      const videoButton = document.getElementById("video-button")
       const video = docuemnt.getElementById("video"); //if not working, try videoButton
 
       //record video produced by the camera
       let mediaRecorder;
+
+      videoButton.onclick = () => {
+        switch (videoButton.textContent){
+          case "Start Recording":
+            videoButton.textContent = "Stop Recording";
+            startRecording();
+            break;
+          case "Stop Recording":
+            videoButton.textContent = "Start Recording";
+            stopRecording();
+            break;
+        }
+      };
 
       //initialize webcam, started using anynchronous fucntion
       async function init(){
@@ -1027,6 +1041,16 @@
         video.srcObject = stream;
         window.stream = stream;
       }
+
+      function startRecording = () => {
+
+      }
+
+      function stopRecording = () => {
+
+      }
+
+      //end of recording functionalities
 
       const setStream = async (video, videoSize, videoFps, stream) => {
         video.srcObject = stream;
