@@ -15,6 +15,18 @@
         max-width: 90%;
       }
 
+      .videoButton {
+        background-color: #ce0202;
+        border: none;
+        color: white;
+        padding: 1px 5px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 11px;
+        max-width: 100px;
+      }
+
       video {
         max-width: 600px;
       }
@@ -22,6 +34,7 @@
       button, input, select {
         font-family: inherit;
       }
+
     </style>
   </head>
 
@@ -95,7 +108,7 @@
       <option value="motion">Motion</option>
       <option value="detail">Detail</option>
       <option value="text">Text</option>
-    </select>
+    </select>addLayer
     <br />
     Transceiver:
     <select id="codec">
@@ -138,7 +151,7 @@
         <span id="videoBrInfo"></span>
       </div>
       <br />
-      <button id="record">record</button>
+      <div class="videoButton" id="main-video-button">Record</div>
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -995,6 +1008,29 @@
           setupPeerConnection();
         }
       };
+
+      //set here the video recording
+      const video = docuemnt.getElementById("video"); //if not working, try videoButton
+
+      //record video produced by the camera
+      let mediaRecorder;
+
+      //initialize webcam, started using anynchronous fucntion
+      async function init(){
+        try{
+          const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+          startWebCamera(stream); //let's make sure the camera works
+        } catch (err){
+          console.log("error: " + err);
+        }
+      }
+
+      //start web camera
+      function startWebCamera(){
+        video.srcObject = stream;
+        window.stream = stream;
+        video.play();
+      }
 
       const setStream = async (video, videoSize, videoFps, stream) => {
         video.srcObject = stream;
