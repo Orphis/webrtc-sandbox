@@ -419,12 +419,24 @@
         const delta = (currStats, prevStats, calc) => {
           return calc(currStats) - calc(prevStats);
         }
+        // the following part makes so that the following appears in Layer 0
+        /*
+        VP8 (libvpx)
+        scalabilityMode: L1T1
+        Limitation: none
+
+        Target: 3000.00 kbps
+        Actual: 441.84 kbps
+        - Avg Enc Time: 1.73 ms
+        - Avg QP: 2
+        - Keyframes: 1
+        */
         intervals.push(setInterval(async () => {
           const currReport = await pc1.getStats();
           refreshEncodingStats(currReport);
           prevReport = currReport;
         }, 1000));
-
+        
         pc1.onicecandidate = (e) => {
           if (e.candidate) {
             pc2.addIceCandidate(e.candidate);
@@ -504,7 +516,7 @@
 
         pc1.oniceconnectionstatechange = (e) => log(pc1.iceConnectionState);
         pc1.onnegotiationneeded = async (e) => {
-          let pc1Offer = await pc1.createOffer();
+          let pc1Offer = await pc1.createOffer();  //shows the actual shared file
           if (resolution.value.includes('-conference')) {
             pc1Offer = addConferenceFlag(pc1Offer);
           }
@@ -559,7 +571,7 @@
         const otherCodecs = RTCRtpSender.getCapabilities("video").codecs.filter(
           (c) => !c.mimeType.includes(codec.value)
         );
-        transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));
+        transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));  //The specified set of codecs will be used for all future connections that include this transceiver until this method is called again.
 
         lastBitrateMesurementTime = performance.now();
         lastBytesSent = 0;
@@ -828,22 +840,24 @@
             const constraint = {...constraints[resolutionName]};
             constraint.video.frameRate = captureFramerate.value;
             if (resolutionName.includes('screen')) {
-              stream = await navigator.mediaDevices.getDisplayMedia(constraint);
-            } else {
+              stream = await navigator.mediaDevices.getDisplayMedia(constraint); //prompts the user to select and grant permission to capture the contents of a display or portion thereof
+            } 
+            else {
               if (captureDevice.value !== 'default') {
                 constraint.video.deviceId = {exact: captureDevice.value};
               }
               stream = await navigator.mediaDevices.getUserMedia(constraint);
             }
+            // after this position the stream is set to what we want to stream!
             streamResolution = resolutionName;
 
             stream.getVideoTracks()[0].contentHint = contentHint.value;
 
             await setStream(
-                videoSource,
+                videoSource,  // This holds the exact location where the stream is going to be shown on the webpage.
                 videoSourceSize,
                 videoSourceFps,
-                stream,
+                stream,  // as written in line 851 here we exactly know what the stream is going to be. 
             );
           }
 
@@ -1023,8 +1037,8 @@
       };
 
       const setStream = async (video, videoSize, videoFps, stream) => {
-        video.srcObject = stream;
-        video.onloadedmetadata = (e) => {
+        video.srcObject = stream;  // here we specify that the stream in focus (either the screen on the camera stream) is going to be shown at the top left corner on the webpage
+        video.onloadedmetadata = (e) => {  // left here to understand
           videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
         };
 
@@ -1032,6 +1046,7 @@
           videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
         };
 
+        // Following line does: sets up an interval that updates the text content of an HTML element (fpsBox) with the frame rate of a video stream at regular 1-second intervals 
         intervals.push(
             window.setInterval(
                 ((fpsBox, track) => {
