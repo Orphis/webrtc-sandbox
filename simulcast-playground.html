@@ -140,6 +140,7 @@
       <br />
       <button type="button" id="buttonStart">Start Recording</button>
       <button type="button" id="buttonStop" disabled>Stop Recording</button>
+      <button type="button" id="download">Download</button>
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -327,6 +328,8 @@
       let transceiver;
       let sender;
       let asender;
+      let mediaRecorder;
+      const recordedChunks = [];
       let lastBitrateMesurementTime;
       let lastBytesSent;
       let lastBytesReceived;
@@ -359,10 +362,10 @@
       const setupPeerConnection = async () => {
         stopPeerConnection();
 
-        pc1 = new RTCPeerConnection({   // Create an RTCPeerConnection object for the sender
+        pc1 = new RTCPeerConnection({
           sdpSemantics: 'unified-plan',
         });
-        pc2 = new RTCPeerConnection({   // Create an RTCPeerConnection object for the receiver
+        pc2 = new RTCPeerConnection({
           sdpSemantics: 'unified-plan',
         });
 
@@ -427,7 +430,7 @@
           prevReport = currReport;
         }, 1000));
         
-        pc1.onicecandidate = (e) => {  // sets up an event handler for the icecandidate event of an RTCPeerConnection object (pc1),
+        pc1.onicecandidate = (e) => {
           if (e.candidate) {
             pc2.addIceCandidate(e.candidate);
           }
@@ -506,11 +509,11 @@
 
         pc1.oniceconnectionstatechange = (e) => log(pc1.iceConnectionState);
         pc1.onnegotiationneeded = async (e) => {
-          let pc1Offer = await pc1.createOffer();   // create an SDP offer. pc1Offer is an RTCSessionDescription
+          let pc1Offer = await pc1.createOffer();
           if (resolution.value.includes('-conference')) {
             pc1Offer = addConferenceFlag(pc1Offer);
           }
-          await pc1.setLocalDescription(pc1Offer); // set the description of pc1's end of the calling
+          await pc1.setLocalDescription(pc1Offer);
 
           const pc2Offer = {
             type: 'offer',
@@ -524,9 +527,9 @@
           }
 
           console.log('pc2 offer: ' + pc2Offer.sdp);
-          await pc2.setRemoteDescription(pc2Offer);  // tell pc2 about pc1's WebRTC configuration
+          await pc2.setRemoteDescription(pc2Offer);
 
-          const answer = await pc2.createAnswer();  // create an SDP answer to send to pc1
+          const answer = await pc2.createAnswer();
           await pc2.setLocalDescription(answer);
           let pc1Answer = {
             type: 'answer',
@@ -543,12 +546,12 @@
           }
 
           console.log('pc1 answer: ' + pc1Answer.sdp);
-          await pc1.setRemoteDescription(pc1Answer); // tell pc1 about pc2's WebRTC configuration
+          await pc1.setRemoteDescription(pc1Answer);
         };
 
         const params = readParameters();
         console.log(JSON.stringify(params, 0, 2));
-        transceiver = pc1.addTransceiver(stream.getVideoTracks()[0], {  // this replaces addTrack. addTransceiver is more flexible (you can give prefered codecs e.g.) than addTrack
+        transceiver = pc1.addTransceiver(stream.getVideoTracks()[0], {
           streams: [stream],
           sendEncodings: params.encodings,
         });
@@ -561,7 +564,7 @@
         const otherCodecs = RTCRtpSender.getCapabilities("video").codecs.filter(
           (c) => !c.mimeType.includes(codec.value)
         );
-        transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));  //The specified set of codecs will be used for all future connections that include this transceiver until this method is called again.
+        transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));
 
         lastBitrateMesurementTime = performance.now();
         lastBytesSent = 0;
@@ -791,26 +794,6 @@
         return params;
       };
 
-      document.querySelector('#buttonStart').onclick = async () => {    
-        const videoRecorded = document.querySelector('#videoRecorded')
-        const tracks = [pc2.getReceivers()[0].track];
-        const mediaRecorder = new MediaRecorder(new MediaStream(tracks)); // maybe also add some options
-        
-        mediaRecorder.start()
-        buttonStart.setAttribute('disabled', '')
-        buttonStop.removeAttribute('disabled')
-
-        document.querySelector('#buttonStop').onclick = async () => {
-            mediaRecorder.stop()
-            buttonStart.removeAttribute('disabled')
-            buttonStop.setAttribute('disabled', '')
-          }
-
-          mediaRecorder.addEventListener('dataavailable', event => {
-            videoRecorded.src = URL.createObjectURL(event.data)
-          })
-        }
-
       document.querySelector('#start').onclick = async () => {
         try {
           resolutionName = resolution.value;
@@ -1023,6 +1006,67 @@
           setupPeerConnection();
         }
       };
+
+      /*
+      document.querySelector('#buttonStart').onclick = async () => {    
+        const videoRecorded = document.querySelector('#videoRecorded')
+        const tracks = [pc2.getReceivers()[0].track];
+        options = {}  // Meaning - enable passthrough if situation allows
+        const mediaRecorder = new MediaRecorder(new MediaStream(tracks), options);
+        
+        mediaRecorder.start()
+        buttonStart.setAttribute('disabled', '')
+        buttonStop.removeAttribute('disabled')
+
+        document.querySelector('#buttonStop').onclick = async () => {
+            mediaRecorder.stop()
+            buttonStart.removeAttribute('disabled')
+            buttonStop.setAttribute('disabled', '')
+          }
+
+        mediaRecorder.addEventListener('dataavailable', event => {
+          videoRecorded.src = URL.createObjectURL(event.data)
+          })
+      }
+      */
+
+      document.querySelector('#buttonStart').onclick = async () => {
+        const tracks = [pc2.getReceivers()[0].track];
+        options = {}  // Meaning - enable passthrough if situation allows
+        mediaRecorder = new MediaRecorder(new MediaStream(tracks), options);
+        
+        mediaRecorder.start()
+        buttonStart.setAttribute('disabled', '')
+        buttonStop.removeAttribute('disabled')
+      }
+
+      document.querySelector('#buttonStop').onclick = async () => {
+        buttonStart.removeAttribute('disabled')
+        buttonStop.setAttribute('disabled', '')
+        mediaRecorder.stop()
+        
+        mediaRecorder.addEventListener('dataavailable', e => {
+          if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+          }
+        });
+      }
+
+      document.querySelector('#download').onclick = async () => {
+        // This part should be fixed
+        const blob = new Blob(recordedChunks, {'type': 'video/webm'});  // combines the recorded chunks to a single blob
+        const url = URL.createObjectURL(blob);
+
+        // Create a link element for downloading
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        a.href = url;
+        a.download = 'recorded-video.webm'; // Set the desired filename
+
+        a.click();
+      }
 
       const setStream = async (video, videoSize, videoFps, stream) => {
         // sets the stream (what we want to stream) to the correct video box defined in the html box (the variable video should contain this)
