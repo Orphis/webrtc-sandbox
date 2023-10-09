@@ -14,8 +14,20 @@
         padding: 5px 5px 5px 5px;
         max-width: 90%;
       }
+      #videoPreview {
+        display: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-around;
+        height: auto;
+      }
 
-      .videoButton {
+      #recorded-video {
+        max-width: 600px;
+      }
+
+      #start-video-button {
         background-color: #ce0202;
         border: none;
         color: white;
@@ -27,8 +39,16 @@
         max-width: 100px;
       }
 
-      video {
-        max-width: 600px;
+      #stop-video-button {
+        background-color: #0216ce;
+        border: none;
+        color: white;
+        padding: 1px 5px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 11px;
+        max-width: 100px;
       }
 
       button, input, select {
@@ -108,7 +128,7 @@
       <option value="motion">Motion</option>
       <option value="detail">Detail</option>
       <option value="text">Text</option>
-    </select>addLayer
+    </select>
     <br />
     Transceiver:
     <select id="codec">
@@ -151,7 +171,9 @@
         <span id="videoBrInfo"></span>
       </div>
       <br />
-      <div class="videoButton" id="main-video-button">Record</div>
+      <div class="videoButton" id="start-video-button">Start Record</div>
+      <div class="videoButton" id="stop-video-button">Stop Record</div>
+      <div ></div>
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -239,7 +261,12 @@
       <br />
     </div>
     <br />
-    <div id="div"></div>
+    <div id="div">
+      <div>
+        Recorded video:
+      </div>
+      <video id="recorded-video" controls></video>
+    </div>
 
     <script>
       const constraints = {
@@ -329,6 +356,7 @@
         },
       };
 
+      //here is where the parameters for the simulcast/encoded video are set
       let pc1;
       let pc2;
       let stream;
@@ -1010,45 +1038,54 @@
       };
 
       //set here the video recording
-      const videoButton = document.getElementById("video-button")
-      const video = docuemnt.getElementById("video"); //if not working, try videoButton
+      const videoButtonStart = document.getElementById('start-video-button')
+      const videoButtonStop = document.getElementById('stop-video-button')
+      const recordedVideo = document.getElementById('recorded-video'); //if not working, try videoButton
 
       //record video produced by the camera
       let mediaRecorder;
+      let recordedChunks = [];
 
-      videoButton.onclick = () => {
-        switch (videoButton.textContent){
-          case "Start Recording":
-            videoButton.textContent = "Stop Recording";
-            startRecording();
-            break;
-          case "Stop Recording":
-            videoButton.textContent = "Start Recording";
-            stopRecording();
-            break;
+      //event handler for the Start Recording button
+      videoButtonStart.addEventListener('click', () => {
+        navigator.mediaDevices.getUserMedia({video: true}).then(function (stream){
+          mediaRecorder = new MediaRecorder(stream);
+
+          //event handler for when data is available
+          mediaRecorder.ondataavailable = function(e) {
+            if (e.data.size>0){ //if the size of the event is positive
+              recordedChunks.push(e.data);
+            }
+          };
+          
+          //event handler for when the recording stops
+          mediaRecorder.onstop = function(){
+            const recordedBlob = new Blob(recordedChunks, {
+              type: 'video/webm, codecs=vp9'
+            });
+            console.log(recordedBlob) //first log
+            recordedVideo.src = window.URL.createObjectURL(recordedBlob);
+          };
+
+          //in here we start the recording
+          mediaRecorder.start();
+          videoButtonStart.disabled = true;
+          videoButtonStop.disabled = false;
+
+        }).catch(function (err){
+          console.log('Error accessing the media devices from the computer: ', err.message);
+        });
+
+      });
+
+      //event handler for the Stop Recording button
+      videoButtonStop.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive'){
+          mediaRecorder.stop();
+          videoButtonStart.disabled = false;
+          videoButtonStop.disabled = true;
         }
-      };
-
-      //initialize webcam, started using anynchronous fucntion
-      async function init(){
-        try{
-          const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-          startWebCamera(stream); //let's make sure the camera works
-        } catch (err){ console.log("Error getting media device: " + err); }
-      }
-
-      function startWebCamera(){ //start web camera
-        video.srcObject = stream;
-        window.stream = stream;
-      }
-
-      function startRecording = () => {
-
-      }
-
-      function stopRecording = () => {
-
-      }
+      });
 
       //end of recording functionalities
 
