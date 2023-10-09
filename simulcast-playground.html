@@ -320,6 +320,7 @@
         },
       };
 
+      // global variables
       let pc1;
       let pc2;
       let stream;
@@ -358,10 +359,10 @@
       const setupPeerConnection = async () => {
         stopPeerConnection();
 
-        pc1 = new RTCPeerConnection({
+        pc1 = new RTCPeerConnection({   // Create an RTCPeerConnection object for the sender
           sdpSemantics: 'unified-plan',
         });
-        pc2 = new RTCPeerConnection({
+        pc2 = new RTCPeerConnection({   // Create an RTCPeerConnection object for the receiver
           sdpSemantics: 'unified-plan',
         });
 
@@ -419,25 +420,14 @@
         const delta = (currStats, prevStats, calc) => {
           return calc(currStats) - calc(prevStats);
         }
-        // the following part makes so that the following appears in Layer 0
-        /*
-        VP8 (libvpx)
-        scalabilityMode: L1T1
-        Limitation: none
 
-        Target: 3000.00 kbps
-        Actual: 441.84 kbps
-        - Avg Enc Time: 1.73 ms
-        - Avg QP: 2
-        - Keyframes: 1
-        */
         intervals.push(setInterval(async () => {
           const currReport = await pc1.getStats();
           refreshEncodingStats(currReport);
           prevReport = currReport;
         }, 1000));
         
-        pc1.onicecandidate = (e) => {
+        pc1.onicecandidate = (e) => {  // sets up an event handler for the icecandidate event of an RTCPeerConnection object (pc1),
           if (e.candidate) {
             pc2.addIceCandidate(e.candidate);
           }
@@ -516,11 +506,11 @@
 
         pc1.oniceconnectionstatechange = (e) => log(pc1.iceConnectionState);
         pc1.onnegotiationneeded = async (e) => {
-          let pc1Offer = await pc1.createOffer();  //shows the actual shared file
+          let pc1Offer = await pc1.createOffer();   // create an SDP offer. pc1Offer is an RTCSessionDescription
           if (resolution.value.includes('-conference')) {
             pc1Offer = addConferenceFlag(pc1Offer);
           }
-          await pc1.setLocalDescription(pc1Offer);
+          await pc1.setLocalDescription(pc1Offer); // set the description of pc1's end of the calling
 
           const pc2Offer = {
             type: 'offer',
@@ -534,9 +524,9 @@
           }
 
           console.log('pc2 offer: ' + pc2Offer.sdp);
-          await pc2.setRemoteDescription(pc2Offer);
+          await pc2.setRemoteDescription(pc2Offer);  // tell pc2 about pc1's WebRTC configuration
 
-          const answer = await pc2.createAnswer();
+          const answer = await pc2.createAnswer();  // create an SDP answer to send to pc1
           await pc2.setLocalDescription(answer);
           let pc1Answer = {
             type: 'answer',
@@ -553,12 +543,12 @@
           }
 
           console.log('pc1 answer: ' + pc1Answer.sdp);
-          await pc1.setRemoteDescription(pc1Answer);
+          await pc1.setRemoteDescription(pc1Answer); // tell pc1 about pc2's WebRTC configuration
         };
 
         const params = readParameters();
         console.log(JSON.stringify(params, 0, 2));
-        transceiver = pc1.addTransceiver(stream.getVideoTracks()[0], {
+        transceiver = pc1.addTransceiver(stream.getVideoTracks()[0], {  // this replaces addTrack. addTransceiver is more flexible (you can give prefered codecs e.g.) than addTrack
           streams: [stream],
           sendEncodings: params.encodings,
         });
@@ -803,10 +793,8 @@
 
       document.querySelector('#buttonStart').onclick = async () => {    
         const videoRecorded = document.querySelector('#videoRecorded')
-
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'video/webm',
-        })
+        const tracks = [pc2.getReceivers()[0].track];
+        const mediaRecorder = new MediaRecorder(new MediaStream(tracks)); // maybe also add some options
         
         mediaRecorder.start()
         buttonStart.setAttribute('disabled', '')
@@ -857,13 +845,13 @@
                 videoSource,  // This holds the exact location where the stream is going to be shown on the webpage.
                 videoSourceSize,
                 videoSourceFps,
-                stream,  // as written in line 851 here we exactly know what the stream is going to be. 
+                stream,  // as written above here we exactly know what the stream is going to be. 
             );
           }
 
           setupPeerConnection();
-        } catch (e) {
-          log(e);
+        } catch (e) { // catch = except in python. 'e' is the error message in try (if encountered)
+          log(e); //logs the error
         }
       };
 
@@ -1037,8 +1025,9 @@
       };
 
       const setStream = async (video, videoSize, videoFps, stream) => {
-        video.srcObject = stream;  // here we specify that the stream in focus (either the screen on the camera stream) is going to be shown at the top left corner on the webpage
-        video.onloadedmetadata = (e) => {  // left here to understand
+        // sets the stream (what we want to stream) to the correct video box defined in the html box (the variable video should contain this)
+        video.srcObject = stream;  // here we specify that the stream in focus (either the screen on the camera stream) is going to be shown whereever 'video' is pointing at
+        video.onloadedmetadata = (e) => {  // when the data (video in this case) is loaded this function is called and updates the size of the video. 
           videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
         };
 
