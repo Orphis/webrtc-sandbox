@@ -62,18 +62,20 @@
     <table>
       <tr>
         <td>
-          <video id="videoSource" autoplay controls muted></video>
+          <span><video id="videoSource" autoplay controls muted></video></span>
         </td>
         <td>
-          <video id="videoMerged" autoplay controls></video>
+          <span><video id="videoMerged" autoplay controls></video></span>
         </td>
       </tr>
       <tr>
         <td>
+          <span>Raw video:</span>
           <span id="videoSourceSize">0x0</span>
           <span id="videoSourceFps">0</span> fps
         </td>
         <td>
+          <span>Encoded video:</span>
           <span id="videoMergedSize">0x0</span>
           <span id="videoMergedFps">0</span> fps
         </td>
@@ -263,7 +265,7 @@
     <br />
     <div id="div">
       <div>
-        Recorded video:
+        Recording (of the encoded video):
       </div>
       <video id="recorded-video" controls></video>
     </div>
@@ -1048,47 +1050,36 @@
 
       //event handler for the Start Recording button
       videoButtonStart.addEventListener('click', () => {
-        navigator.mediaDevices.getUserMedia({video: true}).then(function (stream){
-          mediaRecorder = new MediaRecorder(stream);
 
-          //event handler for when data is available
-          mediaRecorder.ondataavailable = function(e) {
-            if (e.data.size>0){ //if the size of the event is positive
-              recordedChunks.push(e.data);
-            }
-          };
-          
-          //event handler for when the recording stops
-          mediaRecorder.onstop = function(){
-            const recordedBlob = new Blob(recordedChunks, {
-              type: 'video/webm, codecs=vp9'
-            });
-            console.log(recordedBlob) //first log
-            recordedVideo.src = window.URL.createObjectURL(recordedBlob);
-          };
+        //here we get the track from the peer connection
+        const tracks = [pc2.getReceivers()[0].track] 
+        
+        options = {} //here we enable the passthrough, if allowed
 
-          //in here we start the recording
-          mediaRecorder.start();
-          videoButtonStart.disabled = true;
-          videoButtonStop.disabled = false;
+        const mediaRecorder = new MediaRecorder(new MediaStream(tracks), options);
 
-        }).catch(function (err){
-          console.log('Error accessing the media devices from the computer: ', err.message);
-        });
+        //event handler for when data is available
+        mediaRecorder.ondataavailable = function(e) {
+          if (e.data.size>0){ //if the size of the event is positive
+            recordedChunks.push(e.data);
+          }
+          recordedVideo.src = window.URL.createObjectURL(e.data);
+        };
 
-      });
+        //in here we start the recording
+        mediaRecorder.start();
+        videoButtonStart.disabled = true;
+        videoButtonStop.disabled = false;
 
-      //event handler for the Stop Recording button
-      videoButtonStop.addEventListener('click', () => {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive'){
+        //event handler for the Stop Recording button and event handler for when the recording stops
+        videoButtonStop.addEventListener('click', () => {
           mediaRecorder.stop();
           videoButtonStart.disabled = false;
           videoButtonStop.disabled = true;
-        }
+        });
       });
 
       //end of recording functionalities
-
       const setStream = async (video, videoSize, videoFps, stream) => {
         video.srcObject = stream;
         video.onloadedmetadata = (e) => {
