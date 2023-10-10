@@ -1010,29 +1010,6 @@
         }
       };
 
-      /*
-      document.querySelector('#buttonStart').onclick = async () => {    
-        const videoRecorded = document.querySelector('#videoRecorded')
-        const tracks = [pc2.getReceivers()[0].track];
-        options = {}  // Meaning - enable passthrough if situation allows
-        const mediaRecorder = new MediaRecorder(new MediaStream(tracks), options);
-        
-        mediaRecorder.start()
-        buttonStart.setAttribute('disabled', '')
-        buttonStop.removeAttribute('disabled')
-
-        document.querySelector('#buttonStop').onclick = async () => {
-            mediaRecorder.stop()
-            buttonStart.removeAttribute('disabled')
-            buttonStop.setAttribute('disabled', '')
-          }
-
-        mediaRecorder.addEventListener('dataavailable', event => {
-          videoRecorded.src = URL.createObjectURL(event.data)
-          })
-      }
-      */
-
       document.querySelector('#buttonStart').onclick = async () => {
         const tracks = [pc2.getReceivers()[0].track];
         options = {}  // Meaning - enable passthrough if situation allows
