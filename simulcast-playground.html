@@ -230,6 +230,8 @@
     <div>
       <video controls playsinline id="videoRecorded"></video>
       <br />
+      <label for="fileName">To download the recorded video enter a file name:</label>
+      <input type="text" id="fileName" placeholder="Enter file name">
       <button type="button" id="download">Download</button>
     </div>
     <div id="div"></div>
@@ -1054,8 +1056,20 @@
         });
       }
 
+      function confirmFileName() {
+        return new Promise((resolve) => {
+            const fileNameInput = document.getElementById('fileName').value;
+            if (fileNameInput.trim() === "") {
+                alert('Please enter a file name.');
+            } else {
+                resolve(fileNameInput);
+            }
+          });
+        }
+
       document.querySelector('#download').onclick = async () => {
-        // This part should be fixed
+        const fileName = await confirmFileName();
+
         const blob = new Blob(recordedChunks, {'type': 'video/webm'});  // combines the recorded chunks to a single blob
         const url = URL.createObjectURL(blob);
 
@@ -1065,7 +1079,7 @@
         document.body.appendChild(a);
         
         a.href = url;
-        a.download = 'recorded-video.webm'; // Set the desired filename
+        a.download = fileName + ".webm"; // Set the desired filename
 
         a.click();
         recordedChunks = [];  // reset the recordedChunks if a new video is wanted to be recorded the old data is not added. 
