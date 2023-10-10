@@ -185,6 +185,7 @@
       <br />
       <button type="button" id="buttonStart">Start Recording</button>
       <button type="button" id="buttonStop" disabled>Stop Recording</button>
+      <br />
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -1011,6 +1012,8 @@
         const divCount = divs.length;
 
         const newDiv = divs[0].cloneNode(true);
+        newDiv.querySelector('#buttonStart').onclick = async () => { buttonStartFunc(newDiv, divCount) };
+        newDiv.querySelector('#buttonStop').onclick = async () => { buttonStopFunc(newDiv) };
         divs[divCount - 1].insertAdjacentElement('afterend', newDiv);
         newDiv.dataset.layer = divCount;
         newDiv.querySelector('span').textContent = divCount;
@@ -1055,20 +1058,20 @@
         }
       };
 
-      document.querySelector('#buttonStart').onclick = async () => {
+      async function buttonStartFunc(div, track_num) { 
         recordedChunks = [];  // reset the recordedChunks. Dont want the old recordings
-        const tracks = [pc2.getReceivers()[0].track];
+        const tracks = [pc2.getReceivers()[track_num].track];
         options = {}  // Meaning - enable passthrough if situation allows
         mediaRecorder = new MediaRecorder(new MediaStream(tracks), options); //passthrough recording
         
         mediaRecorder.start()
-        buttonStart.setAttribute('disabled', '')
-        buttonStop.removeAttribute('disabled')
+        div.querySelector('#buttonStart').setAttribute('disabled', '')
+        div.querySelector('#buttonStop').removeAttribute('disabled')
       }
 
-      document.querySelector('#buttonStop').onclick = async () => {
-        buttonStart.removeAttribute('disabled')
-        buttonStop.setAttribute('disabled', '')
+      async function buttonStopFunc(div) {
+        div.querySelector('#buttonStart').removeAttribute('disabled')
+        div.querySelector('#buttonStop').setAttribute('disabled', '')
         mediaRecorder.stop()
         
         mediaRecorder.addEventListener('dataavailable', e => {
@@ -1155,6 +1158,11 @@
         restoreSettings(window.location.search);
       }
 
+      const divs = document.querySelectorAll('div[data-layer]');
+      firstDiv = divs[0];
+      firstDiv.querySelector('#buttonStart').onclick = async () => { buttonStartFunc(firstDiv, 0) };
+      firstDiv.querySelector('#buttonStop').onclick = async () => { buttonStopFunc(firstDiv) };  
+      
       (async () => {
         // Enumerate all devices
         const mediaStream = await navigator.mediaDevices.getUserMedia({
