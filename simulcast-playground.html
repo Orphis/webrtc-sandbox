@@ -14,7 +14,8 @@
         padding: 5px 5px 5px 5px;
         max-width: 90%;
       }
-      #videoPreview {
+
+      #videoPreview {  
         display: none;
         display: flex;
         flex-direction: column;
@@ -23,11 +24,11 @@
         height: auto;
       }
 
-      #recorded-video {
+      #video {
         max-width: 600px;
       }
 
-      #start-video-button {
+      #buttonStart {
         background-color: #ce0202;
         border: none;
         color: white;
@@ -39,7 +40,12 @@
         max-width: 100px;
       }
 
-      #stop-video-button {
+      #buttonStart:disabled {
+        background-color: gray;
+        color: #ccc;
+      }
+
+      #buttonStop {
         background-color: #0216ce;
         border: none;
         color: white;
@@ -51,10 +57,14 @@
         max-width: 100px;
       }
 
+      #buttonStop:disabled {
+        background-color: gray;
+        color: #ccc;
+      }
+
       button, input, select {
         font-family: inherit;
       }
-
     </style>
   </head>
 
@@ -70,7 +80,7 @@
       </tr>
       <tr>
         <td>
-          <span>Raw video:</span>
+          <span>Source video:</span>
           <span id="videoSourceSize">0x0</span>
           <span id="videoSourceFps">0</span> fps
         </td>
@@ -173,9 +183,8 @@
         <span id="videoBrInfo"></span>
       </div>
       <br />
-      <div class="videoButton" id="start-video-button">Start Record</div>
-      <div class="videoButton" id="stop-video-button">Stop Record</div>
-      <div ></div>
+      <button type="button" id="buttonStart">Start Recording</button>
+      <button type="button" id="buttonStop" disabled>Stop Recording</button>
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -263,12 +272,16 @@
       <br />
     </div>
     <br />
-    <div id="div">
-      <div>
-        Recording (of the encoded video):
-      </div>
-      <video id="recorded-video" controls></video>
+    <h2> The recorded video: </h2>
+    <div>
+      <video controls playsinline id="videoRecorded"></video>
+      <br/>
+      <label for="fileName">To download the recorded video enter a file name:</label>
+      </br>
+      <input type="text" id="fileName" placeholder="Enter file name">
+      <button type="button" id="download">Download</button>
     </div>
+    <div id="div"></div>
 
     <script>
       const constraints = {
@@ -358,13 +371,15 @@
         },
       };
 
-      //here is where the parameters for the simulcast/encoded video are set
+      // global variables
       let pc1;
       let pc2;
       let stream;
       let transceiver;
       let sender;
       let asender;
+      let mediaRecorder;
+      let recordedChunks = [];
       let lastBitrateMesurementTime;
       let lastBytesSent;
       let lastBytesReceived;
@@ -458,12 +473,13 @@
         const delta = (currStats, prevStats, calc) => {
           return calc(currStats) - calc(prevStats);
         }
+
         intervals.push(setInterval(async () => {
           const currReport = await pc1.getStats();
           refreshEncodingStats(currReport);
           prevReport = currReport;
         }, 1000));
-
+        
         pc1.onicecandidate = (e) => {
           if (e.candidate) {
             pc2.addIceCandidate(e.candidate);
@@ -1039,47 +1055,58 @@
         }
       };
 
-      //set here the video recording
-      const videoButtonStart = document.getElementById('start-video-button')
-      const videoButtonStop = document.getElementById('stop-video-button')
-      const recordedVideo = document.getElementById('recorded-video'); //if not working, try videoButton
-
-      //record video produced by the camera
-      let mediaRecorder;
-      let recordedChunks = [];
-
-      //event handler for the Start Recording button
-      videoButtonStart.addEventListener('click', () => {
-
-        //here we get the track from the peer connection
-        const tracks = [pc2.getReceivers()[0].track] 
+      document.querySelector('#buttonStart').onclick = async () => {
+        recordedChunks = [];  // reset the recordedChunks. Dont want the old recordings
+        const tracks = [pc2.getReceivers()[0].track];
+        options = {}  // Meaning - enable passthrough if situation allows
+        mediaRecorder = new MediaRecorder(new MediaStream(tracks), options); //passthrough recording
         
-        options = {} //here we enable the passthrough, if allowed
+        mediaRecorder.start()
+        buttonStart.setAttribute('disabled', '')
+        buttonStop.removeAttribute('disabled')
+      }
 
-        const mediaRecorder = new MediaRecorder(new MediaStream(tracks), options);
-
-        //event handler for when data is available
-        mediaRecorder.ondataavailable = function(e) {
-          if (e.data.size>0){ //if the size of the event is positive
+      document.querySelector('#buttonStop').onclick = async () => {
+        buttonStart.removeAttribute('disabled')
+        buttonStop.setAttribute('disabled', '')
+        mediaRecorder.stop()
+        
+        mediaRecorder.addEventListener('dataavailable', e => {
+          if (e.data.size > 0) {
+            videoRecorded.src = URL.createObjectURL(event.data)
             recordedChunks.push(e.data);
           }
-          recordedVideo.src = window.URL.createObjectURL(e.data);
-        };
-
-        //in here we start the recording
-        mediaRecorder.start();
-        videoButtonStart.disabled = true;
-        videoButtonStop.disabled = false;
-
-        //event handler for the Stop Recording button and event handler for when the recording stops
-        videoButtonStop.addEventListener('click', () => {
-          mediaRecorder.stop();
-          videoButtonStart.disabled = false;
-          videoButtonStop.disabled = true;
         });
-      });
+      }
 
-      //end of recording functionalities
+      function confirmFileName() {
+        return new Promise((resolve) => {
+            const fileNameInput = document.getElementById('fileName').value;
+            if (fileNameInput.trim() === "") {
+                alert('Please enter a file name.');
+            } else {
+                resolve(fileNameInput);
+            }
+          });
+        }
+
+      document.querySelector('#download').onclick = async () => {
+        const fileName = await confirmFileName();
+
+        const blob = new Blob(recordedChunks, {'type': 'video/webm'});  // combines the recorded chunks to a single blob
+        const url = URL.createObjectURL(blob);
+
+        // Create a link element for downloading
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        a.href = url;
+        a.download = fileName + ".webm"; // Set the desired filename
+
+        a.click();
+      }
+
       const setStream = async (video, videoSize, videoFps, stream) => {
         video.srcObject = stream;
         video.onloadedmetadata = (e) => {
