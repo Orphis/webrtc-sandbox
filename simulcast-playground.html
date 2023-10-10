@@ -140,7 +140,6 @@
       <br />
       <button type="button" id="buttonStart">Start Recording</button>
       <button type="button" id="buttonStop" disabled>Stop Recording</button>
-      <button type="button" id="download">Download</button>
       <label
         >codec:
         <select id="forceCodec" style="width: 10em">
@@ -228,10 +227,12 @@
       <br />
     </div>
     <br />
-    <div id="div"></div>
     <div>
       <video controls playsinline id="videoRecorded"></video>
+      <br />
+      <button type="button" id="download">Download</button>
     </div>
+    <div id="div"></div>
 
     <script>
       const constraints = {
@@ -329,7 +330,7 @@
       let sender;
       let asender;
       let mediaRecorder;
-      const recordedChunks = [];
+      let recordedChunks = [];
       let lastBitrateMesurementTime;
       let lastBytesSent;
       let lastBytesReceived;
@@ -1047,6 +1048,7 @@
         
         mediaRecorder.addEventListener('dataavailable', e => {
           if (e.data.size > 0) {
+            videoRecorded.src = URL.createObjectURL(event.data)
             recordedChunks.push(e.data);
           }
         });
@@ -1066,6 +1068,7 @@
         a.download = 'recorded-video.webm'; // Set the desired filename
 
         a.click();
+        recordedChunks = [];  // reset the recordedChunks if a new video is wanted to be recorded the old data is not added. 
       }
 
       const setStream = async (video, videoSize, videoFps, stream) => {
