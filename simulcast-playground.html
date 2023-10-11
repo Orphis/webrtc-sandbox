@@ -15,6 +15,14 @@
         max-width: 90%;
       }
 
+      .logsBox {
+        display: inline-block;
+        border: 1px solid blue;
+        margin: 5px 5px 5px 5px;
+        padding: 5px 5px 5px 5px;
+        max-width: 70%;
+      }
+
       #videoPreview {  
         display: none;
         display: flex;
@@ -282,7 +290,8 @@
       <input type="text" id="fileName" placeholder="Enter file name">
       <button type="button" id="download">Download</button>
     </div>
-    <div id="div"></div>
+
+    <div class='logsBox' id="div"></div>
 
     <script>
       const constraints = {
