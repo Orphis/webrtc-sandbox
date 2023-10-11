@@ -855,6 +855,7 @@
           ) {
             for (const track of stream.getVideoTracks()) {
               track.stop();
+              alert('Allow again the use of the camera to start the stream.');
             }
             stream = null;
           }
@@ -960,7 +961,7 @@
       document.querySelector('#stop').onclick = () => {
       for (const track of stream.getVideoTracks()) {
           track.stop();
-          alert('Allow the use of the camera to start the stream.');
+          alert('Allow again the use of the camera to start the stream.');
         }
         stream = null;
         stopPeerConnection();
@@ -1110,7 +1111,7 @@
       }
 
       function showAlert(){
-        alert("Allow the use of the camera start the video and allow recording! ");
+        alert("Allow again the use of the camera start the video and allow recording! ");
       }
 
       const setStream = async (video, videoSize, videoFps, stream) => {
@@ -1179,15 +1180,13 @@
           captureDevice.appendChild(option);
         }
 
-        for (const track of mediaStream.getTracks()) {
-          track.stop();
-        }
-
         // Restore saved device
         if (bookmarkDevice) {
           captureDevice.value = bookmarkDevice;
         }
-      })();
+      })
+      
+      ();
     </script>
   </body>
 </html>
