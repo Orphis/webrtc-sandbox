@@ -958,8 +958,9 @@
       };
 
       document.querySelector('#stop').onclick = () => {
-        for (const track of stream.getVideoTracks()) {
+      for (const track of stream.getVideoTracks()) {
           track.stop();
+          alert('Allow the use of the camera to start the stream.');
         }
         stream = null;
         stopPeerConnection();
@@ -1089,7 +1090,7 @@
                 resolve(fileNameInput);
             }
           });
-        }
+      }
 
       document.querySelector('#download').onclick = async () => {
         const fileName = await confirmFileName();
@@ -1106,6 +1107,10 @@
         a.download = fileName + ".webm"; // Set the desired filename
 
         a.click();
+      }
+
+      function showAlert(){
+        alert("Allow the use of the camera start the video and allow recording! ");
       }
 
       const setStream = async (video, videoSize, videoFps, stream) => {
