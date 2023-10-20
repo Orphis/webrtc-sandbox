@@ -1106,12 +1106,19 @@
         videoElement.setAttribute("playsinline", "true");
         videoElement.setAttribute("id", "videoRecorded");
 
-        // Create a button element
+        // Create a download-button element
         var downloadButton = document.createElement("button");
         downloadButton.setAttribute("type", "button");
         downloadButton.setAttribute("id", "download");
         downloadButton.setAttribute("record_id", record_id);
         downloadButton.innerHTML = "Download";
+
+        // Create a delete-button element
+        var deleteButton = document.createElement("button");
+        deleteButton.setAttribute("type", "button");
+        deleteButton.setAttribute("id", "delete");
+        deleteButton.setAttribute("record_id", record_id);
+        deleteButton.innerHTML = "Delete";
 
         // Create a ul element
         var ulElement = document.createElement("ul");
@@ -1121,6 +1128,7 @@
         newDiv.appendChild(document.createElement("br"));
         newDiv.appendChild(ulElement);
         newDiv.appendChild(downloadButton);
+        newDiv.appendChild(deleteButton);
         newDiv.appendChild(document.createElement("br"));
 
         var videoDiv = document.getElementById("video-div");
@@ -1139,6 +1147,10 @@
           a.download = recordedName[downloadButton.getAttribute("record_id")] + ".webm"; // Set the desired filename
 
           a.click();
+        }
+        
+        deleteButton.onclick = async() => {
+          newDiv.remove();
         }
         return newDiv;
       }
