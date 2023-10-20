@@ -283,16 +283,8 @@
       <br />
     </div>
     <br />
-    <h3> The recorded video: </h3>
-    <div>
-      <video controls playsinline id="videoRecorded"></video>
-      <br/>
-      <label for="fileName">To download the recorded video enter a file name:</label>
-      </br>
-      <input type="text" id="fileName" placeholder="Enter file name">
-      <button type="button" id="download">Download</button>
-    </div>
-
+    <h3> The recorded videos: </h3>
+    <div class='videoBox' id="video-div"></div>
     <div class='logsBox' id="div"></div>
 
     <script>
@@ -391,7 +383,9 @@
       let sender;
       let asender;
       let mediaRecorder;
-      let recordedChunks = [];
+      let recordedChunks = {};
+      let recordedName = {};
+      let record_id = 0;
       let lastBitrateMesurementTime;
       let lastBytesSent;
       let lastBytesReceived;
@@ -399,6 +393,7 @@
       let bookmarkDevice;
       let prevReport = null;
       const intervals = [];
+      let sharingOption;
 
       const stopPeerConnection = () => {
         if (pc1) {
@@ -884,6 +879,9 @@
 
             stream.getVideoTracks()[0].contentHint = contentHint.value;
 
+            const videoTrack = stream.getVideoTracks()[0];
+            sharingOption = videoTrack.getSettings().displaySurface;
+
             await setStream(
                 videoSource,
                 videoSourceSize,
@@ -1071,7 +1069,6 @@
       };
 
       async function buttonStartFunc(div, track_num) { 
-        recordedChunks = [];  // reset the recordedChunks. Dont want the old recordings
         const tracks = [pc2.getReceivers()[track_num].track];
         options = {}  // Meaning - enable passthrough if situation allows
         mediaRecorder = new MediaRecorder(new MediaStream(tracks), options); //passthrough recording
@@ -1079,22 +1076,116 @@
         mediaRecorder.start()
         div.querySelector('#buttonStart').setAttribute('disabled', '')
         div.querySelector('#buttonStop').removeAttribute('disabled')
+        recordedName[record_id] = await getName(div);
       }
-
+      
       async function buttonStopFunc(div) {
         div.querySelector('#buttonStart').removeAttribute('disabled')
         div.querySelector('#buttonStop').setAttribute('disabled', '')
         mediaRecorder.stop()
-        
+        newRecordDiv = addRecordedVideo()
+
         mediaRecorder.addEventListener('dataavailable', e => {
           if (e.data.size > 0) {
-            videoRecorded.src = URL.createObjectURL(event.data)
-            recordedChunks.push(e.data);
+            newRecordDiv.querySelector('#videoRecorded').src = URL.createObjectURL(event.data)
+            recordedChunks[record_id] = [];
+            recordedChunks[record_id].push(e.data);
+            record_id += 1;
           }
         });
       }
 
+      function addRecordedVideo(){
+        // Create a new div element
+        var newDiv = document.createElement("div");
+        newDiv.setAttribute("video-layer", record_id);
+
+        // Create a video element
+        var videoElement = document.createElement("video");
+        videoElement.setAttribute("controls", "true");
+        videoElement.setAttribute("playsinline", "true");
+        videoElement.setAttribute("id", "videoRecorded");
+
+        // Create a button element
+        var downloadButton = document.createElement("button");
+        downloadButton.setAttribute("type", "button");
+        downloadButton.setAttribute("id", "download");
+        downloadButton.setAttribute("record_id", record_id);
+        downloadButton.innerHTML = "Download";
+
+        // Create a ul element
+        var ulElement = document.createElement("ul");
+
+        // Append the video, ul, and button elements to the new div
+        newDiv.appendChild(videoElement);
+        newDiv.appendChild(document.createElement("br"));
+        newDiv.appendChild(ulElement);
+        newDiv.appendChild(downloadButton);
+        newDiv.appendChild(document.createElement("br"));
+
+        var videoDiv = document.getElementById("video-div");
+        videoDiv.insertBefore(newDiv, videoDiv.firstChild);
+
+        downloadButton.onclick = async () => {
+          const blob = new Blob(recordedChunks[downloadButton.getAttribute("record_id")], {'type': 'video/webm'});  // combines the recorded chunks to a single blob
+          const url = URL.createObjectURL(blob);
+
+          // Create a link element for downloading
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          
+          a.href = url;
+          a.download = recordedName[downloadButton.getAttribute("record_id")] + ".webm"; // Set the desired filename
+
+          a.click();
+        }
+        return newDiv;
+      }
+
+      async function getName(div) {
+        downloadName = {};
+
+        // Get the used codec
+        const test = await pc1.getStats(null).then(stats => {
+              stats.forEach(element => {
+                  if (element.mimeType != undefined){
+                    downloadName["codec"] = element.mimeType.split("/")[1];
+                  }
+              })});
+        
+        if (sharingOption != undefined){
+          downloadName["sharingOption"] = sharingOption;
+        }
+        else{ 
+          downloadName["sharingOption"] = "camera";
+        }
+        downloadName["kbps"] = div.querySelector('#maxBitrate').value/1000;
+        downloadName["fps"] = div.querySelector('#maxFramerate').value;
+        //we dont want this currently but can be added later on
+        //downloadName["scale"] = div.querySelector('#scaleResolutionDownBy').value;
+        //downloadName["layer"] = track_num;
+
+        const concatenatedPairs = [];
+
+        Object.keys(downloadName).forEach(key => {
+          if (key != "codec"){
+            const pair = `${key}:${downloadName[key]}`;
+            concatenatedPairs.push(pair);
+          } else {
+            const pair = `${downloadName[key]}`;
+            concatenatedPairs.push(pair);
+          };
+          
+        });
+
+        // Join the array using '_' as a delimiter
+        const name = concatenatedPairs.join('_');
+        return name;
+      } 
+
       function confirmFileName() {
+        // Can be used when manuel name to the file should be given
         return new Promise((resolve) => {
             const fileNameInput = document.getElementById('fileName').value;
             if (fileNameInput.trim() === "") {
@@ -1103,23 +1194,6 @@
                 resolve(fileNameInput);
             }
           });
-      }
-
-      document.querySelector('#download').onclick = async () => {
-        const fileName = await confirmFileName();
-
-        const blob = new Blob(recordedChunks, {'type': 'video/webm'});  // combines the recorded chunks to a single blob
-        const url = URL.createObjectURL(blob);
-
-        // Create a link element for downloading
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        
-        a.href = url;
-        a.download = fileName + ".webm"; // Set the desired filename
-
-        a.click();
       }
 
       function showAlert(){
@@ -1140,6 +1214,7 @@
             window.setInterval(
                 ((fpsBox, track) => {
                   fpsBox.textContent = track.getSettings().frameRate.toFixed(1);
+                  //console.log(`Frame Rate: ${fpsBox.textContent} fps`);
                 }).bind(null, videoFps, stream.getTracks()[0]),
                 1000,
             ),
