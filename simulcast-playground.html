@@ -336,6 +336,7 @@
       let bookmarkDevice;
       let prevReport = null;
       const intervals = [];
+      let videoSourceInterval = null;
 
       const stopPeerConnection = () => {
         if (pc1) {
@@ -354,6 +355,7 @@
         for (const interval of intervals) {
           window.clearInterval(interval);
         }
+        intervals.length = 0;
       };
 
       const removeTilde = (r) => r.startsWith('~') ? r.substring(1) : r;
@@ -372,19 +374,23 @@
         const refreshEncodingStats = (currReport) => {
           const encodings = sender.getParameters().encodings;
           for (let layerId = 0; layerId < encodings.length; ++layerId) {
-            const statsSpan = document.querySelector(
-              'div[data-layer="' + layerId + '"]',
-            ).querySelector('#stats');
+            const statsSpan = document.querySelector(`div[data-layer="${layerId}"]`).querySelector('#stats');
 
             try {
               const currRtp = [...currReport.values()].find(s => {
                 return s.type == 'outbound-rtp' &&
                       (s.rid == undefined || s.rid == layerId);
               });
+
+              document.querySelector(`div[data-layer="${layerId}"]`)
+                      .querySelector('#videoSize').innerText = `${currRtp.frameWidth}x${currRtp.frameHeight}`;
+              document.querySelector(`div[data-layer="${layerId}"]`)
+                      .querySelector('#videoFps').innerText = `${currRtp.framesPerSecond}`;
+
               const prevRtp =
                   currRtp && prevReport && prevReport.get(currRtp.id);
               if (!currRtp || !prevRtp) {
-                statsSpan.innerText = "\n\nStats missing";
+                statsSpan.innerText = "Stats missing";
                 continue;
               }
               const deltaSeconds =
@@ -403,9 +409,7 @@
                   delta(currRtp, prevRtp, s => s.qpSum) /
                   delta(currRtp, prevRtp, s => s.framesEncoded);
 
-              statsSpan.innerText = `
-
-                ${currReport.get(currRtp.codecId).mimeType.substring(6)} (${currRtp.encoderImplementation})
+              statsSpan.innerText = `${currReport.get(currRtp.codecId).mimeType.substring(6)} (${currRtp.encoderImplementation})
                 scalabilityMode: ${currRtp.scalabilityMode}
                 Limitation: ${currRtp.qualityLimitationReason}
 
@@ -442,12 +446,12 @@
         pc2.ontrack = async (e) => {
           try {
             if (splitLayer.value == 'merged') {
-              await setStream(
+              intervals.push(setStream(
                   videoMerged,
                   videoMergedSize,
                   videoMergedFps,
                   e.streams[0],
-              );
+              ));
             } else {
               console.log(
                   'Got stream with id:' +
@@ -462,10 +466,7 @@
                   'div[data-layer="' + layerId + '"]',
               );
               div.querySelector('#videoPreview').style.display = 'inline';
-              const videoElement = div.querySelector('video');
-              const videoSize = div.querySelector('#videoSize');
-              const videoFps = div.querySelector('#videoFps');
-              await setStream(videoElement, videoSize, videoFps, e.streams[0]);
+              div.querySelector('video').srcObject = e.streams[0];
             }
             intervals.push(
                 setInterval(async () => {
@@ -804,6 +805,10 @@
               track.stop();
             }
             stream = null;
+            if (videoSourceInterval) {
+              window.clearInterval(videoSourceInterval);
+              videoSourceInterval = null;
+            }
           }
           if (!stream) {
             const constraint = {...constraints[resolutionName]};
@@ -820,7 +825,7 @@
 
             stream.getVideoTracks()[0].contentHint = contentHint.value;
 
-            await setStream(
+            videoSourceInterval = setStream(
                 videoSource,
                 videoSourceSize,
                 videoSourceFps,
@@ -909,6 +914,10 @@
           track.stop();
         }
         stream = null;
+        if (videoSourceInterval) {
+          window.clearInterval(videoSourceInterval);
+          videoSourceInterval = null;
+        }
         stopPeerConnection();
       };
 
@@ -1003,7 +1012,7 @@
         }
       };
 
-      const setStream = async (video, videoSize, videoFps, stream) => {
+      const setStream = (video, videoSize, videoFps, stream) => {
         video.srcObject = stream;
         video.onloadedmetadata = (e) => {
           videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
@@ -1013,14 +1022,14 @@
           videoSize.textContent = video.videoWidth + 'x' + video.videoHeight;
         };
 
-        intervals.push(
-            window.setInterval(
-                ((fpsBox, track) => {
-                  fpsBox.textContent = track.getSettings().frameRate.toFixed(1);
-                }).bind(null, videoFps, stream.getTracks()[0]),
-                1000,
-            ),
-        );
+        return window.setInterval(
+            ((fpsBox, track) => {
+              const frameRate = track.getSettings().frameRate;
+              if (frameRate) {
+                fpsBox.textContent = frameRate.toFixed(1);
+              }
+            }).bind(null, videoFps, stream.getTracks()[0]),
+            1000);
       };
 
       const is = (stat, type) => stat.type == type && !stat.isRemote; // skip RTCP
