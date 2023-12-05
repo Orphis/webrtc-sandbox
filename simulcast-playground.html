@@ -64,25 +64,31 @@
       <option value="default">Default Device</option>
     </select>
     <select id="resolution">
-      <option value="WHQVGA">240x135 (WHQVGA)</option>
-      <option value="WQVGA">320x180 (WQVGA)</option>
-      <option value="QVGA">320x240 (QVGA)</option>
-      <option value="WHVGA">480x270 (WHVGA)</option>
-      <option value="HVGA">480x360 (HVGA)</option>
-      <option value="WVGA">640x360 (WVGA)</option>
-      <option value="VGA">640x480 (VGA)</option>
-      <option value="HD" selected>1280x720 (HD)</option>
-      <option value="FullHD">1920x1080 (FullHD)</option>
-      <option value="4K">4096x2160 (4K)</option>
-      <option value="8K">7680x4320 (8K)</option>
-      <option value="screen">Screen</option>
-      <option value="screen-FullHD">Screen (FullHD)</option>
-      <option value="screen-HD">Screen (HD)</option>
-      <option value="screen-conference">Screen (conference)</option>
-      <option value="screen-conference-FullHD">
-        Screen (FullHD, conference)
-      </option>
-      <option value="screen-conference-HD">Screen (HD, conference)</option>
+      <optgroup label="User Media">
+        <option value="WHQVGA">240x135 (WHQVGA)</option>
+        <option value="WQVGA">320x180 (WQVGA)</option>
+        <option value="QVGA">320x240 (QVGA)</option>
+        <option value="WHVGA">480x270 (WHVGA)</option>
+        <option value="HVGA">480x360 (HVGA)</option>
+        <option value="WVGA">640x360 (WVGA)</option>
+        <option value="VGA">640x480 (VGA)</option>
+        <option value="HD" selected>1280x720 (HD)</option>
+        <option value="FullHD">1920x1080 (FullHD)</option>
+        <option value="4K">4096x2160 (4K)</option>
+        <option value="8K">7680x4320 (8K)</option>
+      </optgroup>
+      <optgroup label="Display Media">
+        <option value="screen">Screen</option>
+        <option value="screen-FullHD">Screen (FullHD)</option>
+        <option value="screen-HD">Screen (HD)</option>
+      </optgroup>
+      <optgroup label="Display Media / Conference">
+        <option value="screen-conference">Screen (conference)</option>
+        <option value="screen-conference-FullHD">
+          Screen (FullHD, conference)
+        </option>
+        <option value="screen-conference-HD">Screen (HD, conference)</option>
+      </optgroup>
     </select>
     <select id="captureFramerate">
       <option value="5">5 FPS</option>
