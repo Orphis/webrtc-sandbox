@@ -22,6 +22,10 @@
       button, input, select {
         font-family: inherit;
       }
+
+      summary {
+        font-weight: bold;
+      }
     </style>
   </head>
 
@@ -137,92 +141,96 @@
         <br />
         <span id="videoBrInfo"></span>
       </div>
-      <br />
-      <label
-        >codec:
-        <select id="forceCodec" style="width: 10em">
-          <option value="">None</option>
-        </select>
-      </label>
-      <br />
-      <label
-        >maxBitrate (bps):
-        <input type="number" id="maxBitrate" value="3000000" size="8" style="width: 8em;" />
-      </label>
-      <br />
-      <label
-        >scaleResolutionDownBy:
-        <input type="number" id="scaleResolutionDownBy" value="1" size="3"  style="width: 5em;" />
-      </label>
-      <br />
-      <label
-        >maxFramerate (fps):
-        <input type="number" id="maxFramerate" value="60" size="3" style="width: 7em;" />
-      </label>
-      <br />
-      <label
-        >scalabilityMode:
-        <select id="scalabilityMode" style="width: 9em;">
-          <option value="">None</option>
-          <option value="L1T1">L1T1</option>
-          <option value="L1T2">L1T2</option>
-          <option value="L1T3">L1T3</option>
-          <option value="L2T1">L2T1</option>
-          <option value="L2T1h">L2T1h</option>
-          <option value="L2T1_KEY">L2T1_KEY</option>
-          <option value="L2T2">L2T2</option>
-          <option value="L2T2h">L2T2h</option>
-          <option value="L2T2_KEY">L2T2_KEY</option>
-          <option value="L2T2_KEY_SHIFT">L2T2_KEY_SHIFT</option>
-          <option value="L2T3">L2T3</option>
-          <option value="L2T3h">L2T3h</option>
-          <option value="L2T3_KEY">L2T3_KEY</option>
-          <option value="L2T3_KEY_SHIFT">L2T3_KEY_SHIFT</option>
-          <option value="L3T1">L3T1</option>
-          <option value="L3T1h">L3T1h</option>
-          <option value="L3T1_KEY">L3T1_KEY</option>
-          <option value="L3T2">L3T2</option>
-          <option value="L3T2h">L3T2h</option>
-          <option value="L3T2_KEY">L3T2_KEY</option>
-          <option value="L3T2_KEY_SHIFT">L3T2_KEY_SHIFT</option>
-          <option value="L3T3">L3T3</option>
-          <option value="L3T3h">L3T3h</option>
-          <option value="L3T3_KEY">L3T3_KEY</option>
-          <option value="L3T3_KEY_SHIFT">L3T3_KEY_SHIFT</option>
-          <option value="S2T1">S2T1</option>
-          <option value="S2T1h">S2T1h</option>
-          <option value="S2T2">S2T2</option>
-          <option value="S2T2h">S2T2h</option>
-          <option value="S2T3">S2T3</option>
-          <option value="S2T3h">S2T3h</option>
-          <option value="S3T1">S3T1</option>
-          <option value="S3T1h">S3T1h</option>
-          <option value="S3T2">S3T2</option>
-          <option value="S3T2h">S3T2h</option>
-          <option value="S3T3">S3T3</option>
-          <option value="S3T3h">S3T3h</option>
-        </select>
-      </label>
-      <br />
-      <label
-        >Active:
-        <select id="active">
-          <option value="on">On</option>
-          <option value="off">Off</option>
-        </select>
-      </label>
-      <br />
-      <label
-        >priority:
-        <select id="priority">
-          <option value="very-low">Very Low</option>
-          <option value="low" selected>Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
-      </label>
-      <span id="stats"></span>
-      <br />
+      <details open>
+        <summary>Encoder settings</summary>
+        <label
+          >codec:
+          <select id="forceCodec" style="width: 10em">
+            <option value="">None</option>
+          </select>
+        </label>
+        <br />
+        <label
+          >maxBitrate (bps):
+          <input type="number" id="maxBitrate" value="3000000" size="8" style="width: 8em;" />
+        </label>
+        <br />
+        <label
+          >scaleResolutionDownBy:
+          <input type="number" id="scaleResolutionDownBy" value="1" size="3"  style="width: 5em;" />
+        </label>
+        <br />
+        <label
+          >maxFramerate (fps):
+          <input type="number" id="maxFramerate" value="60" size="3" style="width: 7em;" />
+        </label>
+        <br />
+        <label
+          >scalabilityMode:
+          <select id="scalabilityMode" style="width: 9em;">
+            <option value="">None</option>
+            <option value="L1T1">L1T1</option>
+            <option value="L1T2">L1T2</option>
+            <option value="L1T3">L1T3</option>
+            <option value="L2T1">L2T1</option>
+            <option value="L2T1h">L2T1h</option>
+            <option value="L2T1_KEY">L2T1_KEY</option>
+            <option value="L2T2">L2T2</option>
+            <option value="L2T2h">L2T2h</option>
+            <option value="L2T2_KEY">L2T2_KEY</option>
+            <option value="L2T2_KEY_SHIFT">L2T2_KEY_SHIFT</option>
+            <option value="L2T3">L2T3</option>
+            <option value="L2T3h">L2T3h</option>
+            <option value="L2T3_KEY">L2T3_KEY</option>
+            <option value="L2T3_KEY_SHIFT">L2T3_KEY_SHIFT</option>
+            <option value="L3T1">L3T1</option>
+            <option value="L3T1h">L3T1h</option>
+            <option value="L3T1_KEY">L3T1_KEY</option>
+            <option value="L3T2">L3T2</option>
+            <option value="L3T2h">L3T2h</option>
+            <option value="L3T2_KEY">L3T2_KEY</option>
+            <option value="L3T2_KEY_SHIFT">L3T2_KEY_SHIFT</option>
+            <option value="L3T3">L3T3</option>
+            <option value="L3T3h">L3T3h</option>
+            <option value="L3T3_KEY">L3T3_KEY</option>
+            <option value="L3T3_KEY_SHIFT">L3T3_KEY_SHIFT</option>
+            <option value="S2T1">S2T1</option>
+            <option value="S2T1h">S2T1h</option>
+            <option value="S2T2">S2T2</option>
+            <option value="S2T2h">S2T2h</option>
+            <option value="S2T3">S2T3</option>
+            <option value="S2T3h">S2T3h</option>
+            <option value="S3T1">S3T1</option>
+            <option value="S3T1h">S3T1h</option>
+            <option value="S3T2">S3T2</option>
+            <option value="S3T2h">S3T2h</option>
+            <option value="S3T3">S3T3</option>
+            <option value="S3T3h">S3T3h</option>
+          </select>
+        </label>
+        <br />
+        <label
+          >Active:
+          <select id="active">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <br />
+        <label
+          >priority:
+          <select id="priority">
+            <option value="very-low">Very Low</option>
+            <option value="low" selected>Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+      </details>
+      <details>
+        <summary>Encoder stats</summary>
+        <span id="stats">No stats available yet.</span>
+      </details>
     </div>
     <br />
     <div id="div"></div>
