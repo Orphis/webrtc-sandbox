@@ -1,6 +1,7 @@
 <html>
   <head>
     <title>WebRTC Playground</title>
+    <meta charset="UTF-8">
     <style>
       body {
         font-family: monospace;
@@ -26,6 +27,67 @@
       summary {
         font-weight: bold;
       }
+
+      .VideoPlayer {
+        position: relative;
+      }
+
+      .VideoPlayer button {
+        color: darkgray;
+        border-width: medium;
+        border-color: white;
+        border-style: hidden;
+        background-color: transparent;
+        text-shadow:
+          1px 1px 1px #000,
+          -1px 1px 1px #000,
+          -1px -1px 0 #000,
+          1px -1px 0 #000;
+        font-size: 1.8em;
+        line-height: 1.5em;
+        vertical-align: middle;
+        filter: drop-shadow(2px 4px 6px black)
+      }
+
+
+      .VideoPlayer button:hover {
+        color: white;
+      }
+
+      .RecordButton {
+        font-size: 1em !important;
+      }
+      .RecordButton:hover {
+        filter: brightness(1.2) drop-shadow(2px 4px 6px black);
+      }
+
+      .VideoPlayerControls {
+        position:absolute;
+        z-index: 1;
+        bottom: 0px;
+        right: 0px;
+        margin-right:5px;
+      }
+
+      #recordingList {
+        margin-left: 10px;
+      }
+
+      .blink {
+        animation: blink 1s linear infinite;
+      }
+
+      @keyframes blink {
+        25% {
+          opacity: 0.5;
+        }
+        50% {
+          opacity: 0;
+        }
+        75% {
+          opacity: 0.5;
+        }
+      }
     </style>
   </head>
 
@@ -33,10 +95,21 @@
     <table>
       <tr>
         <td>
-          <video id="videoSource" autoplay controls muted></video>
+          <div class="VideoPlayer">
+            <video id="videoSource" autoplay muted></video>
+            <div class="VideoPlayerControls">
+              <button onclick="javascript:videoFullscreen(this)" title="Fullscreen">⛶</button>
+            </div>
+          </div>
         </td>
         <td>
-          <video id="videoMerged" autoplay controls></video>
+          <div class="VideoPlayer" style="display: none">
+            <video id="videoMerged" autoplay></video>
+            <div class="VideoPlayerControls">
+              <button class="RecordButton" onclick="javascript:videoRecord(this)" title="Record">🔴</button>
+              <button onclick="javascript:videoFullscreen(this)" title="Fullscreen">⛶</button>
+            </div>
+          </div>
         </td>
       </tr>
       <tr>
@@ -142,10 +215,12 @@
       <span id="layerId">0</span> <span id="videoSize">0x0</span>
       <span id="videoFps">0</span> fps
       <br />
-      <div id="videoPreview" style="display: none">
-        <video id="video" autoplay controls muted></video>
-        <br />
-        <span id="videoBrInfo"></span>
+      <div id="videoPreview" class="VideoPlayer" style="display: none">
+        <video id="video" autoplay muted></video>
+        <div class="VideoPlayerControls">
+          <button class="RecordButton" onclick="javascript:videoRecord(this)" title="Record">🔴</button>
+          <button onclick="javascript:videoFullscreen(this)" title="Fullscreen">⛶</button>
+        </div>
       </div>
       <details open>
         <summary>Encoder settings</summary>
@@ -239,6 +314,13 @@
       </details>
     </div>
     <br />
+    <div id="recordingListBox" style="display: none">
+      <details open>
+        <summary>Recordings</summary>
+        <div id="recordingList">          
+        </div>
+      </details>
+    </div>
     <div id="div"></div>
 
     <script>
@@ -343,6 +425,8 @@
       let prevReport = null;
       const intervals = [];
       let videoSourceInterval = null;
+      const recorders = {};
+      const recordings = [];
 
       const stopPeerConnection = () => {
         if (pc1) {
@@ -357,6 +441,8 @@
         for (const layer of layers) {
           layer.querySelector('#videoPreview').style.display = 'none';
         }
+
+        videoMerged.closest(".VideoPlayer").style.display = splitLayer.value == 'merged' ? "inline" : "none";
 
         for (const interval of intervals) {
           window.clearInterval(interval);
@@ -1037,6 +1123,99 @@
             }).bind(null, videoFps, stream.getTracks()[0]),
             1000);
       };
+
+      const videoFullscreen = (e) => {
+        console.log(e);
+        const videoPlayer = e.closest("div.VideoPlayer");
+        const videoElement = videoPlayer.querySelector("video");
+        videoElement.requestFullscreen();
+      }
+
+      const videoRecord = async (e) => {
+        const encodingBox = e.closest("div.encodingBox");
+        const layer = encodingBox ? Number(encodingBox.dataset.layer) : 0;
+        e.classList.toggle("blink");
+
+        if (recorders[layer]) {
+          // We have a recording on-going, stop and add the file to the download list
+          recorders[layer].mediaRecorder.stop();
+          const recording = {
+            name: recorders[layer].name,
+            chunks: [],
+          };
+          recordings.push(recording);
+
+          let dataRecordedResolve;
+          const dataRecorded = new Promise(r => dataRecordedResolve = r);
+
+          recorders[layer].mediaRecorder.addEventListener('dataavailable', e => {
+            if (e.data.size > 0) {
+              recording.chunks.push(e.data);
+              dataRecordedResolve();
+            }
+          });
+
+          await dataRecorded;
+
+          delete recorders[layer];
+
+          recordingListBox.style.display = "inline";
+
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.innerText = `${recording.name} `;
+
+          const downloadLink = document.createElement("a");
+          downloadLink.href = URL.createObjectURL(recording.chunks[0]);
+          downloadLink.download = `${recording.name}.webm`;
+          downloadLink.innerText = "Download";
+          summary.appendChild(downloadLink);
+
+          details.appendChild(summary);
+
+          const video = document.createElement("video");
+          video.controls = true;
+          video.muted = true;
+          video.src = downloadLink.href;
+          details.appendChild(video);
+
+          recordingList.appendChild(details);
+
+        } else {
+          // No recording on-going for this layer, start one
+          const tracks = [pc2.getReceivers()[layer].track];
+          options = {}  // Enable passthrough if situation allows
+          const mediaRecorder = new MediaRecorder(new MediaStream(tracks), options);
+
+          mediaRecorder.start()
+          recorders[layer] = {
+            mediaRecorder,
+            name: await getRecordingName(layer),
+          }
+        }
+      }
+
+      getRecordingName = async (layerId) => {
+        downloadName = {};
+        const parameters = readParameters();
+
+        // Get the used codec
+        const stats = await pc1.getStats();
+        const outboundRtp = [...stats.values()].find(s => {
+                return s.type == 'outbound-rtp' &&
+                      (s.rid == undefined || s.rid == layerId);
+              });
+        const codec = stats.get(outboundRtp.codecId).mimeType.substring(6);
+        const sharingOption = sender.track.getSettings().displaySurface ?? "camera";
+        const bitrate = parameters.encodings[layerId].maxBitrate / 1000;
+        const framerate = parameters.encodings[layerId].maxFramerate;
+        // Remove ':' from the date as those are not valid Windows file name characters
+        const date = new Date().toISOString().replaceAll(':', '_');
+
+        const name = `layer${layerId}_${sharingOption}_${codec}_${bitrate}kbps_${framerate}fps_${date}`;
+        return name;
+      } 
+
 
       const is = (stat, type) => stat.type == type && !stat.isRemote; // skip RTCP
       const findStat = (map, type) =>
