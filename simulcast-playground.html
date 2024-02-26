@@ -128,11 +128,11 @@
       </tr>
     </table>
     <button id="start">Start</button>
-    <button id="stop">Stop</button> | 
+    <button id="stop">Stop</button> |
     <button id="copyBookmark">Copy Bookmark</button>
     <button id="copyBookmarkWithDevice">Copy Bookmark (+device)</button>
     <br />
-    Source: 
+    Source:
     <select id="captureDevice">
       <option value="default">Default Device</option>
     </select>
@@ -317,7 +317,7 @@
     <div id="recordingListBox" style="display: none">
       <details open>
         <summary>Recordings</summary>
-        <div id="recordingList">          
+        <div id="recordingList">
         </div>
       </details>
     </div>
@@ -536,6 +536,17 @@
           }
         };
         pc2.ontrack = async (e) => {
+          if (e.transceiver && e.transceiver.setCodecPreferences) {
+            // Move the desired codecs in front
+
+            const wantedCodecs = RTCRtpReceiver.getCapabilities(
+              'video'
+            ).codecs.filter((c) => c.mimeType.includes(codec.value));
+            const otherCodecs = RTCRtpReceiver.getCapabilities("video").codecs.filter(
+              (c) => !c.mimeType.includes(codec.value)
+            );
+            e.transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));
+          }
           try {
             if (splitLayer.value == 'merged') {
               intervals.push(setStream(
@@ -647,15 +658,6 @@
           sendEncodings: params.encodings,
         });
         sender = transceiver.sender;
-
-        // Move the desired codecs in front
-        const wantedCodecs = RTCRtpSender.getCapabilities(
-          "video"
-        ).codecs.filter((c) => c.mimeType.includes(codec.value));
-        const otherCodecs = RTCRtpSender.getCapabilities("video").codecs.filter(
-          (c) => !c.mimeType.includes(codec.value)
-        );
-        transceiver.setCodecPreferences(wantedCodecs.concat(otherCodecs));
 
         lastBitrateMesurementTime = performance.now();
         lastBytesSent = 0;
@@ -1214,7 +1216,7 @@
 
         const name = `layer${layerId}_${sharingOption}_${codec}_${bitrate}kbps_${framerate}fps_${date}`;
         return name;
-      } 
+      }
 
 
       const is = (stat, type) => stat.type == type && !stat.isRemote; // skip RTCP
